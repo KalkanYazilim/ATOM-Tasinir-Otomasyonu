@@ -1,0 +1,108 @@
+@model TasinirKayit
+@using ATOM.Models.Domain
+@{
+    ViewData["Title"] = Model.Id != null && !string.IsNullOrEmpty(Model.SicilNo) ? "Taşınır Düzenle" : "Yeni Taşınır Kaydı";
+    var depolar = ViewBag.Depolar as List<Depo> ?? new();
+    var tanimlar = ViewBag.Tanimlar as List<TasinirTanim> ?? new();
+    var durumlar = ViewBag.Durumlar as TasinirKayitDurumu[] ?? Enum.GetValues<TasinirKayitDurumu>();
+    string Dt(DateTime? t) => t?.ToString("yyyy-MM-dd") ?? "";
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/kayit">Taşınır Kayıtları</a></li>
+        <li class="breadcrumb-item active">@ViewData["Title"]</li>
+    </ol>
+}
+
+<form method="post" action="/kayit/Home/Duzenle">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="Id" value="@Model.Id"/>
+    <input type="hidden" name="KurumId" value="@Model.KurumId"/>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0 fw-bold"><i class="bi bi-upc-scan me-2 text-primary"></i>@ViewData["Title"]</h5>
+        <div class="d-flex gap-2">
+            <a href="/kayit" class="btn btn-outline-secondary btn-sm">İptal</a>
+            <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Kaydet</button>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header bg-white fw-semibold">Tanımlama</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3"><label class="form-label small fw-semibold">Barkod</label><input name="BarKod" value="@Model.BarKod" class="form-control form-control-sm"/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">Sicil No <span class="text-danger">*</span></label><input name="SicilNo" value="@Model.SicilNo" class="form-control form-control-sm" required/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">Eski Sicil No</label><input name="EskiSicilNo" value="@Model.EskiSicilNo" class="form-control form-control-sm"/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">Seri No</label><input name="SeriNo" value="@Model.SeriNo" class="form-control form-control-sm"/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">Cinsi <span class="text-danger">*</span></label><input name="Cinsi" value="@Model.Cinsi" class="form-control form-control-sm" required/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">Marka</label><input name="MarkaAdi" value="@Model.MarkaAdi" class="form-control form-control-sm"/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">Model</label><input name="Modeli" value="@Model.Modeli" class="form-control form-control-sm"/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">Ölçü Birimi</label><input name="OlcuAdi" value="@(string.IsNullOrEmpty(Model.OlcuAdi)?"Adet":Model.OlcuAdi)" class="form-control form-control-sm"/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">Birim Fiyat (₺)</label><input name="BirimFiyat" value="@Model.BirimFiyat" type="number" step="0.01" min="0" class="form-control form-control-sm"/></div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold">Durum</label>
+                    <select name="Durum" class="form-select form-select-sm">
+                        @foreach (var d in durumlar)
+                        {
+                            if (Model.Durum == d) { <option value="@d" selected>@d</option> }
+                            else { <option value="@d">@d</option> }
+                        }
+                    </select>
+                </div>
+                <div class="col-12"><label class="form-label small fw-semibold">Açıklama</label><textarea name="Aciklama" class="form-control form-control-sm" rows="2">@Model.Aciklama</textarea></div>
+                <div class="col-12"><label class="form-label small fw-semibold">Ek Özellik</label><textarea name="EkOzellik" class="form-control form-control-sm" rows="2">@Model.EkOzellik</textarea></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header bg-white fw-semibold">Fiş & Kurum Giriş</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3"><label class="form-label small fw-semibold">Fiş No</label><input name="FisNo" value="@Model.FisNo" class="form-control form-control-sm"/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">Fiş İlk Durum</label><input name="FisIlkDurum" value="@Model.FisIlkDurum" class="form-control form-control-sm"/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">Fiş Son Durum</label><input name="FisSonDurum" value="@Model.FisSonDurum" class="form-control form-control-sm"/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">Fiş Tarihi</label><input name="Tarih" value="@Dt(Model.Tarih)" type="date" class="form-control form-control-sm"/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">Kurum Giriş İşlemi</label><input name="KurumGirisIslemi" value="@Model.KurumGirisIslemi" class="form-control form-control-sm"/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">Kurum Giriş Tarihi</label><input name="KurumGirisTarihi" value="@Dt(Model.KurumGirisTarihi)" type="date" class="form-control form-control-sm"/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">İlk Giriş Tarihi</label><input name="IlkGirisTarihi" value="@Dt(Model.IlkGirisTarihi)" type="date" class="form-control form-control-sm"/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">Limit Durumu</label><input name="LimitDurumu" value="@Model.LimitDurumu" class="form-control form-control-sm"/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">Proje Numarası</label><input name="ProjeNumarasi" value="@Model.ProjeNumarasi" class="form-control form-control-sm"/></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header bg-white fw-semibold">Yer / Zimmet / Sayım</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3"><label class="form-label small fw-semibold">Ambar Adı</label><input name="AmbarAdi" value="@Model.AmbarAdi" class="form-control form-control-sm"/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">Verildiği Yer / Birim</label><input name="VerildigiYerBirim" value="@Model.VerildigiYerBirim" class="form-control form-control-sm"/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">TC Numarası</label><input name="TcNumarasi" value="@Model.TcNumarasi" maxlength="11" class="form-control form-control-sm"/></div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold">Depo</label>
+                    <select name="DepoId" class="form-select form-select-sm">
+                        <option value="">– Seçiniz –</option>
+                        @foreach (var d in depolar)
+                        {
+                            if (Model.DepoId == d.Id) { <option value="@d.Id" selected>@d.Ad</option> }
+                            else { <option value="@d.Id">@d.Ad</option> }
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">Harcama Birimi Adı</label><input name="HarBirimiAdi" value="@Model.HarBirimiAdi" class="form-control form-control-sm"/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">Harcama Birimi Kodu</label><input name="HarBirimiKodu" value="@Model.HarBirimiKodu" class="form-control form-control-sm"/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">İl Adı</label><input name="IlAdi" value="@Model.IlAdi" class="form-control form-control-sm"/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">İl Kodu</label><input name="IlKodu" value="@Model.IlKodu" class="form-control form-control-sm"/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">Sayım Kodu</label><input name="SayKod" value="@Model.SayKod" class="form-control form-control-sm"/></div>
+                <div class="col-md-3"><label class="form-label small fw-semibold">Sayım Adı</label><input name="SayAdi" value="@Model.SayAdi" class="form-control form-control-sm"/></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 mb-4">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Kaydet</button>
+        <a href="/kayit" class="btn btn-outline-secondary">İptal</a>
+    </div>
+</form>

@@ -35,6 +35,7 @@ app.UseAuthorization();
 
 app.MapAreaControllerRoute("talep", "Talep", "talep/{controller=Home}/{action=Index}/{id?}");
 app.MapAreaControllerRoute("ihale", "Ihale", "ihale/{controller=Home}/{action=Index}/{id?}");
+app.MapAreaControllerRoute("kayit", "Kayit", "kayit/{controller=Home}/{action=Index}/{id?}");
 app.MapAreaControllerRoute("depo", "Depo", "depo/{controller=Home}/{action=Index}/{id?}");
 app.MapAreaControllerRoute("zimmet", "Zimmet", "zimmet/{controller=Home}/{action=Index}/{id?}");
 app.MapAreaControllerRoute("raporlama", "Raporlama", "raporlama/{controller=Home}/{action=Index}/{id?}");

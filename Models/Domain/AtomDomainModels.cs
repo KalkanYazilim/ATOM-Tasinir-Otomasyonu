@@ -376,6 +376,89 @@ public class Firma
 }
 
 // ─────────────────────────────────────────────────────────────
+// TAŞINIR KAYIT (TKYS / KBS resmi alanları)
+// Her fiziksel demirbaşın tekil kaydı — sicil, barkod, seri vb.
+// ─────────────────────────────────────────────────────────────
+
+public class TasinirKayit
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+
+    // ── Tanımlama ──────────────────────────────────────────────
+    public string BarKod { get; set; } = "";              // bar_kod
+    public string Aciklama { get; set; } = "";            // aciklama
+    public string Cinsi { get; set; } = "";               // cinsi
+    public string EkOzellik { get; set; } = "";           // ekOzellik
+    public string MarkaAdi { get; set; } = "";            // markaAdi
+    public string Modeli { get; set; } = "";              // modeli
+    public string OlcuAdi { get; set; } = "Adet";         // olcuAdi
+
+    // ── Sicil / Seri ──────────────────────────────────────────
+    public string SicilNo { get; set; } = "";             // sicil_no
+    public string EskiSicilNo { get; set; } = "";         // eski_sicil_no
+    public string SeriNo { get; set; } = "";              // seri_no
+
+    // ── Mali ──────────────────────────────────────────────────
+    public decimal BirimFiyat { get; set; }               // birim_fiyat
+
+    // ── Fiş Bilgileri ─────────────────────────────────────────
+    public string FisNo { get; set; } = "";               // fis_no
+    public string FisIlkDurum { get; set; } = "";         // fis_ilk_durum
+    public string FisSonDurum { get; set; } = "";         // fis_son_durum
+    public DateTime? Tarih { get; set; }                  // tarih
+
+    // ── Yer / Zimmet ──────────────────────────────────────────
+    public string VerildigiYerBirim { get; set; } = "";   // verildigi_yer_birim
+    public string TcNumarasi { get; set; } = "";          // tc_numarasi
+    public string AmbarAdi { get; set; } = "";            // ambar_adi
+
+    // ── Kurum Giriş ───────────────────────────────────────────
+    public string KurumGirisIslemi { get; set; } = "";    // kurum_giris_islemi
+    public DateTime? KurumGirisTarihi { get; set; }       // kurum_giris_tarihi
+    public DateTime? IlkGirisTarihi { get; set; }         // ilk_giris_tarihi
+    public string LimitDurumu { get; set; } = "";         // limit_durumu
+
+    // ── Harcama Birimi ────────────────────────────────────────
+    public string HarBirimiAdi { get; set; } = "";        // har_birimi_adi
+    public string HarBirimiKodu { get; set; } = "";       // har_birimi_kodu
+
+    // ── İl / Sayım ────────────────────────────────────────────
+    public string IlAdi { get; set; } = "";               // iladi
+    public string IlKodu { get; set; } = "";              // ilkoduv
+    public string SayKod { get; set; } = "";              // saykod
+    public string SayAdi { get; set; } = "";              // sayadi
+
+    // ── Proje ─────────────────────────────────────────────────
+    public string ProjeNumarasi { get; set; } = "";       // projeNumarasi
+
+    // ── İlişki & İzlenebilirlik (ATOM iç bağları) ─────────────
+    public string? TasinirTanimId { get; set; }           // katalog tanımı
+    public string? DepoId { get; set; }
+    public string? KurumId { get; set; }
+    public string? ZimmetId { get; set; }
+    public TasinirKayitDurumu Durum { get; set; } = TasinirKayitDurumu.Ambarda;
+    public DateTime OlusturmaTarihi { get; set; } = DateTime.UtcNow;
+    public DateTime GuncellemeTarihi { get; set; } = DateTime.UtcNow;
+    public List<TasinirHareket> HareketGecmisi { get; set; } = new();
+}
+
+public enum TasinirKayitDurumu
+{
+    Ambarda, Zimmetli, Bakimda, Sevkte, Hurda, Dusum, Devir
+}
+
+public class TasinirHareket
+{
+    public DateTime Tarih { get; set; } = DateTime.UtcNow;
+    public string IslemTuru { get; set; } = "";   // Giriş, Zimmet, İade, Sevk, Bakım, Hurda
+    public string Aciklama { get; set; } = "";
+    public string KullaniciId { get; set; } = "";
+    public string KullaniciAdi { get; set; } = "";
+    public string? OncekiDurum { get; set; }
+    public string? YeniDurum { get; set; }
+}
+
+// ─────────────────────────────────────────────────────────────
 // BİLDİRİM
 // ─────────────────────────────────────────────────────────────
 

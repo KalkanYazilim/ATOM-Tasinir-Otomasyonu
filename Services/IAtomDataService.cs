@@ -68,6 +68,13 @@ public interface IAtomDataService
     Task<HurdaKaydi?> HurdaKaydiGetirAsync(string id);
     Task HurdaKaydiKaydetAsync(HurdaKaydi kayit);
 
+    // ── Taşınır Kayıt (TKYS) ──────────────────────────────────
+    Task<List<TasinirKayit>> TasinirKayitlariGetirAsync();
+    Task<TasinirKayit?> TasinirKayitGetirAsync(string id);
+    Task TasinirKayitKaydetAsync(TasinirKayit kayit);
+    Task TasinirKayitlariTopluKaydetAsync(IEnumerable<TasinirKayit> kayitlar);
+    Task TasinirKayitSilAsync(string id);
+
     // ── Bildirim ──────────────────────────────────────────────
     Task<List<Bildirim>> BildirimleriGetirAsync(string kullaniciId);
     Task BildirimKaydetAsync(Bildirim bildirim);

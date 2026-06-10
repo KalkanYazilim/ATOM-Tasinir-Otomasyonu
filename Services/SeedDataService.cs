@@ -19,6 +19,7 @@ public class SeedDataHostedService : IHostedService
         await SeedTasinirTanimlar(svc);
         await SeedDepolar(svc);
         await SeedFirmalar(svc);
+        await SeedTasinirKayitlar(svc);
     }
 
     public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
@@ -193,5 +194,83 @@ public class SeedDataHostedService : IHostedService
         };
 
         foreach (var f in firmalar) await svc.FirmaKaydetAsync(f);
+    }
+
+    private static async Task SeedTasinirKayitlar(IAtomDataService svc)
+    {
+        var mevcut = await svc.TasinirKayitlariGetirAsync();
+        if (mevcut.Count > 0) return;
+
+        var rnd = new Random(42);
+        var cinsler = new[]
+        {
+            ("Lazer Yazıcı", "HP", "LaserJet Pro M404", 3500m, "tt-001"),
+            ("Masaüstü Bilgisayar", "Dell", "OptiPlex 7090", 8500m, "tt-004"),
+            ("Dizüstü Bilgisayar", "Lenovo", "ThinkPad E15", 12000m, "tt-005"),
+            ("Monitör 24\"", "Samsung", "S24R350", 2200m, "tt-007"),
+            ("Fotokopi Makinesi", "Canon", "iR 2630", 15000m, "tt-002"),
+            ("Ofis Koltuğu", "Bürotime", "Ergo-X", 1800m, "tt-011"),
+        };
+        var iller = new[] { ("ANKARA","06","k-ankara","Ankara İl Deposu","d-ankara"), ("İSTANBUL","34","k-istanbul","İstanbul İl Deposu","d-istanbul") };
+        var harBirimleri = new[] { ("İdari ve Mali İşler Şube Md.","38.06.00.01"), ("Bilgi İşlem Şube Md.","38.06.00.02"), ("Destek Hizmetleri Md.","38.06.00.03") };
+
+        var kayitlar = new List<TasinirKayit>();
+        int sicilSayac = 1000;
+
+        foreach (var (ilAd, ilKod, kurumId, ambar, depoId) in iller)
+        {
+            for (int i = 0; i < 12; i++)
+            {
+                var (cins, marka, model, fiyat, tanimId) = cinsler[rnd.Next(cinsler.Length)];
+                var (harAd, harKod) = harBirimleri[rnd.Next(harBirimleri.Length)];
+                var zimmetli = rnd.Next(100) < 45;
+                var girisTarih = DateTime.UtcNow.AddDays(-rnd.Next(30, 900));
+                sicilSayac++;
+
+                kayitlar.Add(new TasinirKayit
+                {
+                    BarKod = $"BK{ilKod}{sicilSayac:D6}",
+                    Cinsi = cins,
+                    Aciklama = $"{cins} - {ilAd} envanteri",
+                    MarkaAdi = marka,
+                    Modeli = model,
+                    OlcuAdi = "Adet",
+                    SicilNo = $"253.{ilKod}.{sicilSayac}",
+                    SeriNo = $"SN-{marka.Substring(0, 2).ToUpper()}{rnd.Next(100000, 999999)}",
+                    BirimFiyat = fiyat,
+                    FisNo = $"TIF-{girisTarih.Year}-{rnd.Next(1, 500):D4}",
+                    FisIlkDurum = "Giriş - Satın Alma",
+                    FisSonDurum = zimmetli ? "Zimmet" : "Ambarda",
+                    Tarih = girisTarih,
+                    VerildigiYerBirim = zimmetli ? harAd : "",
+                    TcNumarasi = zimmetli ? rnd.NextInt64(10000000000, 99999999999).ToString() : "",
+                    AmbarAdi = ambar,
+                    KurumGirisIslemi = "Satın Alma",
+                    KurumGirisTarihi = girisTarih,
+                    IlkGirisTarihi = girisTarih,
+                    LimitDurumu = fiyat >= 10000 ? "Limit Üstü" : "Limit Altı",
+                    HarBirimiAdi = harAd,
+                    HarBirimiKodu = harKod,
+                    IlAdi = ilAd,
+                    IlKodu = ilKod,
+                    SayKod = $"SAY-{girisTarih.Year}",
+                    SayAdi = $"{girisTarih.Year} Yılı Sayımı",
+                    ProjeNumarasi = rnd.Next(100) < 30 ? $"PRJ-{rnd.Next(1000, 9999)}" : "",
+                    TasinirTanimId = tanimId,
+                    KurumId = kurumId,
+                    DepoId = depoId,
+                    Durum = zimmetli ? TasinirKayitDurumu.Zimmetli : TasinirKayitDurumu.Ambarda,
+                    OlusturmaTarihi = girisTarih,
+                    GuncellemeTarihi = girisTarih,
+                    HareketGecmisi = new List<TasinirHareket>
+                    {
+                        new() { Tarih = girisTarih, IslemTuru = "Kurum Girişi", Aciklama = "Satın alma yoluyla kayda alındı.",
+                                KullaniciAdi = "Sistem (Seed)", YeniDurum = "Ambarda" }
+                    }
+                });
+            }
+        }
+
+        await svc.TasinirKayitlariTopluKaydetAsync(kayitlar);
     }
 }

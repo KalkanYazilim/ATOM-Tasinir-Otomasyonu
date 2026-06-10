@@ -139,6 +139,27 @@ public class FileAtomDataService : IAtomDataService
     public async Task<HurdaKaydi?> HurdaKaydiGetirAsync(string id) => (await HurdaKayitlariGetirAsync()).FirstOrDefault(x => x.Id == id);
     public Task HurdaKaydiKaydetAsync(HurdaKaydi k) => UpsertAsync("hurda-kayitlar", k, x => x.Id);
 
+    // ── Taşınır Kayıt (TKYS) ──────────────────────────────────
+    public Task<List<TasinirKayit>> TasinirKayitlariGetirAsync() => OkuAsync<TasinirKayit>("tasinir-kayitlar");
+    public async Task<TasinirKayit?> TasinirKayitGetirAsync(string id) => (await TasinirKayitlariGetirAsync()).FirstOrDefault(x => x.Id == id);
+    public Task TasinirKayitKaydetAsync(TasinirKayit k) => UpsertAsync("tasinir-kayitlar", k, x => x.Id);
+    public async Task TasinirKayitlariTopluKaydetAsync(IEnumerable<TasinirKayit> kayitlar)
+    {
+        var liste = await TasinirKayitlariGetirAsync();
+        foreach (var k in kayitlar)
+        {
+            var idx = liste.FindIndex(x => x.Id == k.Id);
+            if (idx >= 0) liste[idx] = k; else liste.Add(k);
+        }
+        await YazAsync("tasinir-kayitlar", liste);
+    }
+    public async Task TasinirKayitSilAsync(string id)
+    {
+        var liste = await TasinirKayitlariGetirAsync();
+        liste.RemoveAll(x => x.Id == id);
+        await YazAsync("tasinir-kayitlar", liste);
+    }
+
     // ── Bildirim ──────────────────────────────────────────────
     public async Task<List<Bildirim>> BildirimleriGetirAsync(string kullaniciId)
         => (await OkuAsync<Bildirim>("bildirimler")).Where(b => b.AliciKullaniciId == kullaniciId).OrderByDescending(b => b.Tarih).ToList();

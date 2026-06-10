@@ -1,0 +1,138 @@
+@model TasinirKayit
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@using System.Security.Claims
+@{
+    ViewData["Title"] = $"Taşınır – {Model.SicilNo}";
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+    var rol = User.FindFirstValue(ClaimTypes.Role) ?? "";
+    bool yetkili = new[] { AtomRoller.MerkezDepoSorumlusu, AtomRoller.IlDepoSorumlusu, AtomRoller.SistemAdmin, AtomRoller.BakanlikMerkez }.Contains(rol);
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/kayit">Taşınır Kayıtları</a></li>
+        <li class="breadcrumb-item active">@Model.SicilNo</li>
+    </ol>
+}
+
+@functions {
+    string D(DateTime? t) => t.HasValue ? t.Value.ToString("dd.MM.yyyy") : "–";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold">
+        <i class="bi bi-upc-scan me-2 text-primary"></i>@Model.Cinsi
+        <span class="text-muted fw-normal fs-6">· Sicil: @Model.SicilNo</span>
+    </h5>
+    @if (yetkili)
+    {
+        <a href="/kayit/Home/Duzenle/@Model.Id" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil me-1"></i>Düzenle</a>
+    }
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="card mb-3">
+            <div class="card-header bg-white fw-semibold"><i class="bi bi-info-circle me-2 text-primary"></i>Tanımlama Bilgileri</div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4"><label class="text-muted small">Barkod</label><div class="fw-semibold">@Model.BarKod</div></div>
+                    <div class="col-md-4"><label class="text-muted small">Sicil No</label><div class="fw-semibold">@Model.SicilNo</div></div>
+                    <div class="col-md-4"><label class="text-muted small">Eski Sicil No</label><div>@(string.IsNullOrEmpty(Model.EskiSicilNo) ? "–" : Model.EskiSicilNo)</div></div>
+                    <div class="col-md-4"><label class="text-muted small">Cinsi</label><div>@Model.Cinsi</div></div>
+                    <div class="col-md-4"><label class="text-muted small">Marka</label><div>@(string.IsNullOrEmpty(Model.MarkaAdi)?"–":Model.MarkaAdi)</div></div>
+                    <div class="col-md-4"><label class="text-muted small">Model</label><div>@(string.IsNullOrEmpty(Model.Modeli)?"–":Model.Modeli)</div></div>
+                    <div class="col-md-4"><label class="text-muted small">Seri No</label><div>@(string.IsNullOrEmpty(Model.SeriNo)?"–":Model.SeriNo)</div></div>
+                    <div class="col-md-4"><label class="text-muted small">Ölçü Birimi</label><div>@Model.OlcuAdi</div></div>
+                    <div class="col-md-4"><label class="text-muted small">Birim Fiyat</label><div class="fw-semibold text-success">@Model.BirimFiyat.ToString("C2", tr)</div></div>
+                    <div class="col-12"><label class="text-muted small">Açıklama</label><div class="p-2 bg-light rounded">@(string.IsNullOrEmpty(Model.Aciklama)?"–":Model.Aciklama)</div></div>
+                    @if (!string.IsNullOrEmpty(Model.EkOzellik))
+                    { <div class="col-12"><label class="text-muted small">Ek Özellik</label><div class="p-2 bg-light rounded">@Model.EkOzellik</div></div> }
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header bg-white fw-semibold"><i class="bi bi-receipt me-2 text-primary"></i>Fiş & Kurum Giriş Bilgileri</div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4"><label class="text-muted small">Fiş No</label><div>@(string.IsNullOrEmpty(Model.FisNo)?"–":Model.FisNo)</div></div>
+                    <div class="col-md-4"><label class="text-muted small">Fiş İlk Durum</label><div>@(string.IsNullOrEmpty(Model.FisIlkDurum)?"–":Model.FisIlkDurum)</div></div>
+                    <div class="col-md-4"><label class="text-muted small">Fiş Son Durum</label><div>@(string.IsNullOrEmpty(Model.FisSonDurum)?"–":Model.FisSonDurum)</div></div>
+                    <div class="col-md-4"><label class="text-muted small">Fiş Tarihi</label><div>@D(Model.Tarih)</div></div>
+                    <div class="col-md-4"><label class="text-muted small">Kurum Giriş İşlemi</label><div>@(string.IsNullOrEmpty(Model.KurumGirisIslemi)?"–":Model.KurumGirisIslemi)</div></div>
+                    <div class="col-md-4"><label class="text-muted small">Kurum Giriş Tarihi</label><div>@D(Model.KurumGirisTarihi)</div></div>
+                    <div class="col-md-4"><label class="text-muted small">İlk Giriş Tarihi</label><div>@D(Model.IlkGirisTarihi)</div></div>
+                    <div class="col-md-4"><label class="text-muted small">Limit Durumu</label><div>@(string.IsNullOrEmpty(Model.LimitDurumu)?"–":Model.LimitDurumu)</div></div>
+                    <div class="col-md-4"><label class="text-muted small">Proje Numarası</label><div>@(string.IsNullOrEmpty(Model.ProjeNumarasi)?"–":Model.ProjeNumarasi)</div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-white fw-semibold"><i class="bi bi-geo-alt me-2 text-primary"></i>Yer / Zimmet / Sayım</div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4"><label class="text-muted small">Ambar Adı</label><div>@(string.IsNullOrEmpty(Model.AmbarAdi)?"–":Model.AmbarAdi)</div></div>
+                    <div class="col-md-4"><label class="text-muted small">Verildiği Yer / Birim</label><div>@(string.IsNullOrEmpty(Model.VerildigiYerBirim)?"–":Model.VerildigiYerBirim)</div></div>
+                    <div class="col-md-4"><label class="text-muted small">TC Numarası</label><div>@(string.IsNullOrEmpty(Model.TcNumarasi)?"–":Model.TcNumarasi)</div></div>
+                    <div class="col-md-4"><label class="text-muted small">Harcama Birimi Adı</label><div>@(string.IsNullOrEmpty(Model.HarBirimiAdi)?"–":Model.HarBirimiAdi)</div></div>
+                    <div class="col-md-4"><label class="text-muted small">Harcama Birimi Kodu</label><div>@(string.IsNullOrEmpty(Model.HarBirimiKodu)?"–":Model.HarBirimiKodu)</div></div>
+                    <div class="col-md-4"><label class="text-muted small">İl Adı / Kodu</label><div>@Model.IlAdi @(string.IsNullOrEmpty(Model.IlKodu)?"":"("+Model.IlKodu+")")</div></div>
+                    <div class="col-md-4"><label class="text-muted small">Sayım Kodu</label><div>@(string.IsNullOrEmpty(Model.SayKod)?"–":Model.SayKod)</div></div>
+                    <div class="col-md-4"><label class="text-muted small">Sayım Adı</label><div>@(string.IsNullOrEmpty(Model.SayAdi)?"–":Model.SayAdi)</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card mb-3">
+            <div class="card-header bg-white fw-semibold">Durum</div>
+            <div class="card-body text-center">
+                @{
+                    var (bg, lbl) = Model.Durum switch {
+                        TasinirKayitDurumu.Ambarda => ("success","Ambarda"),
+                        TasinirKayitDurumu.Zimmetli => ("primary","Zimmetli"),
+                        TasinirKayitDurumu.Bakimda => ("warning","Bakımda"),
+                        TasinirKayitDurumu.Sevkte => ("info","Sevkte"),
+                        TasinirKayitDurumu.Hurda => ("danger","Hurda"),
+                        TasinirKayitDurumu.Dusum => ("secondary","Düşüm"),
+                        TasinirKayitDurumu.Devir => ("dark","Devir"),
+                        _ => ("secondary", Model.Durum.ToString())
+                    };
+                }
+                <span class="badge bg-@bg fs-5 px-3 py-2">@lbl</span>
+                <hr/>
+                <div class="text-muted small text-start">
+                    <div>Oluşturma: @Model.OlusturmaTarihi.ToString("dd.MM.yyyy HH:mm")</div>
+                    <div>Güncelleme: @Model.GuncellemeTarihi.ToString("dd.MM.yyyy HH:mm")</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-white fw-semibold"><i class="bi bi-clock-history me-2 text-primary"></i>Hareket Geçmişi</div>
+            <div class="card-body p-0">
+                @if (Model.HareketGecmisi.Any())
+                {
+                    <div class="list-group list-group-flush">
+                        @foreach (var h in Model.HareketGecmisi.OrderByDescending(x => x.Tarih))
+                        {
+                            <div class="list-group-item py-2">
+                                <div class="d-flex justify-content-between">
+                                    <span class="fw-semibold small">@h.IslemTuru</span>
+                                    <span class="text-muted" style="font-size:.72rem;">@h.Tarih.ToString("dd.MM.yyyy HH:mm")</span>
+                                </div>
+                                @if (!string.IsNullOrEmpty(h.Aciklama)) { <div class="text-muted small">@h.Aciklama</div> }
+                                @if (h.OncekiDurum != null) { <div class="small">@h.OncekiDurum → <strong>@h.YeniDurum</strong></div> }
+                                <div class="text-muted" style="font-size:.72rem;">@h.KullaniciAdi</div>
+                            </div>
+                        }
+                    </div>
+                }
+                else { <div class="text-muted text-center py-3 small">Hareket kaydı yok.</div> }
+            </div>
+        </div>
+    </div>
+</div>
