@@ -1,0 +1,80 @@
+@model List<ATOM.Models.Domain.Sevk>
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@using System.Security.Claims
+@{
+    ViewData["Title"] = "Sevk İşlemleri";
+    var depolar = ViewBag.Depolar as Dictionary<string, string> ?? new();
+    var kurumlar = ViewBag.Kurumlar as Dictionary<string, string> ?? new();
+    var rol = User.FindFirstValue(ClaimTypes.Role) ?? "";
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0"><li class="breadcrumb-item active">Sevk İşlemleri</li></ol>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-truck me-2 text-primary"></i>Sevk İşlemleri</h5>
+    @if (new[]{AtomRoller.MerkezDepoSorumlusu,AtomRoller.BakanlikMerkez,AtomRoller.SistemAdmin}.Contains(rol))
+    {
+        <a href="/depo/Home/YeniSevk" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Yeni Sevk</a>
+    }
+</div>
+
+<div class="card"><div class="card-body p-0">
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+                <tr><th>Sevk No</th><th>Kaynak</th><th>Hedef</th><th>Tarih</th>
+                    <th class="text-center">Kalem</th><th>Taşıyıcı</th><th>Durum</th><th></th></tr>
+            </thead>
+            <tbody>
+            @foreach (var s in Model)
+            {
+                <tr>
+                    <td class="fw-semibold">@s.SevkNo</td>
+                    <td class="small">@(depolar.TryGetValue(s.KaynakDepoId, out var kd) ? kd : "–")</td>
+                    <td class="small">@(depolar.TryGetValue(s.HedefDepoId, out var hd) ? hd : (kurumlar.TryGetValue(s.HedefKurumId, out var hk) ? hk : "–"))</td>
+                    <td class="small">@s.SevkTarihi.ToString("dd.MM.yyyy")</td>
+                    <td class="text-center">@s.Kalemler.Count</td>
+                    <td class="small">@s.TasimaciAdi @(string.IsNullOrEmpty(s.AracPlaka) ? "" : "("+s.AracPlaka+")")</td>
+                    <td>
+                        @switch (s.Durum)
+                        {
+                            case SevkDurumu.Hazirlaniyor: <span class="badge bg-secondary">Hazırlanıyor</span> break;
+                            case SevkDurumu.Yolda: <span class="badge bg-info">Yolda</span> break;
+                            case SevkDurumu.TeslimEdildi: <span class="badge bg-success">Teslim Edildi</span> break;
+                            case SevkDurumu.Reddedildi: <span class="badge bg-danger">Reddedildi</span> break;
+                        }
+                    </td>
+                    <td>
+                        @if (s.Durum != SevkDurumu.TeslimEdildi && s.Durum != SevkDurumu.Reddedildi)
+                        {
+                            <button class="btn btn-sm btn-success py-0" data-bs-toggle="modal" data-bs-target="#teslim@(s.Id)">Teslim Al</button>
+                        }
+                    </td>
+                </tr>
+                @if (s.Durum != SevkDurumu.TeslimEdildi && s.Durum != SevkDurumu.Reddedildi)
+                {
+                    <div class="modal fade" id="teslim@(s.Id)" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+                        <form method="post" action="/depo/Home/SevkTeslimAl">
+                          @Html.AntiForgeryToken()
+                          <input type="hidden" name="id" value="@s.Id"/>
+                          <div class="modal-header"><h6 class="modal-title">@s.SevkNo – Teslim Al</h6>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                          <div class="modal-body">
+                            <p class="small text-muted">Teslim alındığında hedef depo stoğu artar.</p>
+                            <textarea name="aciklama" class="form-control form-control-sm" rows="2" placeholder="Teslim notu"></textarea>
+                          </div>
+                          <div class="modal-footer"><button class="btn btn-success btn-sm">Teslim Al</button></div>
+                        </form>
+                    </div></div></div>
+                }
+            }
+            @if (!Model.Any())
+            {
+                <tr><td colspan="8" class="text-center text-muted py-4">Sevk kaydı yok.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div></div>

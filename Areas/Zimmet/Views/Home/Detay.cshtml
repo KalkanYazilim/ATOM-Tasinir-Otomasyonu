@@ -1,0 +1,111 @@
+@model ATOM.Models.Domain.Zimmet
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@using System.Security.Claims
+@{
+    ViewData["Title"] = $"Zimmet – {Model.ZimmetNo}";
+    var kullanicilar = ViewBag.Kullanicilar as Dictionary<string, string> ?? new();
+    var depolar = ViewBag.Depolar as Dictionary<string, string> ?? new();
+    var rol = User.FindFirstValue(ClaimTypes.Role) ?? "";
+    var benimMi = Model.PersonelId == User.FindFirstValue(ClaimTypes.NameIdentifier);
+    bool iadeYetkisi = benimMi || new[]{AtomRoller.IlMuduru,AtomRoller.IlDepoSorumlusu,AtomRoller.MerkezDepoSorumlusu,AtomRoller.SistemAdmin}.Contains(rol);
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/zimmet">Zimmet</a></li>
+        <li class="breadcrumb-item active">@Model.ZimmetNo</li>
+    </ol>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-person-badge me-2 text-primary"></i>@Model.ZimmetNo
+        <span class="badge bg-@(Model.Durum==ZimmetDurumu.Aktif?"success":Model.Durum==ZimmetDurumu.Iade?"secondary":"warning") ms-2">@Model.Durum</span>
+    </h5>
+    <div class="d-flex gap-2">
+        <a href="/zimmet/Home/Fis/@Model.Id" target="_blank" class="btn btn-outline-secondary btn-sm"><i class="bi bi-printer me-1"></i>Zimmet Fişi</a>
+        @if (Model.Durum == ZimmetDurumu.Aktif && iadeYetkisi)
+        {
+            <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#iadeModal"><i class="bi bi-arrow-return-left me-1"></i>İade Al</button>
+        }
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="card mb-3"><div class="card-body"><div class="row g-3">
+            <div class="col-md-4"><label class="text-muted small">Personel</label><div class="fw-semibold">@(kullanicilar.TryGetValue(Model.PersonelId, out var p) ? p : Model.PersonelId)</div></div>
+            <div class="col-md-4"><label class="text-muted small">Depo</label><div>@(depolar.TryGetValue(Model.DepoId, out var d) ? d : Model.DepoId)</div></div>
+            <div class="col-md-4"><label class="text-muted small">Zimmet Tarihi</label><div>@Model.ZimmetTarihi.ToString("dd.MM.yyyy")</div></div>
+            <div class="col-md-4"><label class="text-muted small">Veren</label><div>@(kullanicilar.TryGetValue(Model.VerenKullaniciId, out var v) ? v : "–")</div></div>
+            <div class="col-md-4"><label class="text-muted small">Teslim Yeri</label><div>@(string.IsNullOrEmpty(Model.TeslimYeri)?"–":Model.TeslimYeri)</div></div>
+            @if (Model.IadeTarihi.HasValue)
+            { <div class="col-md-4"><label class="text-muted small">İade Tarihi</label><div>@Model.IadeTarihi.Value.ToString("dd.MM.yyyy")</div></div> }
+        </div></div></div>
+
+        <div class="card">
+            <div class="card-header bg-white fw-semibold"><i class="bi bi-list-ul me-2"></i>Zimmet Kalemleri (@Model.Kalemler.Count)</div>
+            <div class="card-body p-0"><div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light"><tr><th>Cinsi</th><th>Barkod</th><th>Sicil No</th><th>Seri No</th><th>Marka/Model</th><th>Durum</th></tr></thead>
+                    <tbody>
+                    @foreach (var k in Model.Kalemler)
+                    {
+                        <tr>
+                            <td>@(string.IsNullOrEmpty(k.TasinirTanimId)?k.Marka:(ViewBag.Tanimlar as Dictionary<string,string>)?.GetValueOrDefault(k.TasinirTanimId) ?? k.Marka)</td>
+                            <td class="small">@k.Barkod</td>
+                            <td class="small">@k.SicilNo</td>
+                            <td class="small text-muted">@k.SeriNo</td>
+                            <td class="small">@k.Marka @k.Model</td>
+                            <td><span class="badge bg-light text-dark">@k.ItemDurumu</span>
+                                @if (!string.IsNullOrEmpty(k.HasarAciklama)) { <span class="text-danger small">@k.HasarAciklama</span> }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div></div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card"><div class="card-header bg-white fw-semibold"><i class="bi bi-clock-history me-2"></i>İşlem Geçmişi</div>
+            <div class="card-body p-0">
+                @if (Model.OnayGecmisi.Any())
+                {
+                    <div class="list-group list-group-flush">
+                    @foreach (var o in Model.OnayGecmisi.OrderByDescending(x => x.Tarih))
+                    {
+                        <div class="list-group-item py-2">
+                            <div class="d-flex justify-content-between"><span class="fw-semibold small">@o.Asama</span>
+                                <span class="text-muted" style="font-size:.72rem;">@o.Tarih.ToString("dd.MM.yyyy HH:mm")</span></div>
+                            @if (!string.IsNullOrEmpty(o.Aciklama)) { <div class="text-muted small">@o.Aciklama</div> }
+                            <div class="text-muted" style="font-size:.72rem;">@o.KullaniciAdi</div>
+                        </div>
+                    }
+                    </div>
+                }
+                else { <div class="text-muted text-center py-3 small">Kayıt yok.</div> }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="iadeModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <form method="post" action="/zimmet/Home/Iade">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="id" value="@Model.Id"/>
+        <div class="modal-header"><h6 class="modal-title">Zimmet İadesi</h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <label class="form-label small fw-semibold">İade Türü</label>
+            <select name="iadeTuru" class="form-select form-select-sm mb-3">
+                <option value="Saglam">Sağlam (ambara döner)</option>
+                <option value="Hasarli">Hasarlı (bakıma gider)</option>
+                <option value="Kayip">Kayıp/Eksik</option>
+            </select>
+            <label class="form-label small fw-semibold">Açıklama</label>
+            <textarea name="aciklama" class="form-control form-control-sm" rows="2" required></textarea>
+        </div>
+        <div class="modal-footer"><button class="btn btn-warning btn-sm">İade Al</button></div>
+    </form>
+</div></div></div>

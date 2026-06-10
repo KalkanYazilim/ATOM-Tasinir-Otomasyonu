@@ -1,0 +1,77 @@
+@model ATOM.Models.Domain.Zimmet
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@{
+    ViewData["Title"] = "Yeni Zimmet";
+    var depolar = ViewBag.Depolar as List<Depo> ?? new();
+    var kullanicilar = ViewBag.Kullanicilar as List<AtomKullanici> ?? new();
+    var uygun = ViewBag.UygunTasinirlar as List<TasinirKayit> ?? new();
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/zimmet">Zimmet</a></li>
+        <li class="breadcrumb-item active">Yeni</li>
+    </ol>
+}
+
+<form method="post" action="/zimmet/Home/Yeni">
+    @Html.AntiForgeryToken()
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0 fw-bold"><i class="bi bi-person-badge me-2 text-primary"></i>Yeni Zimmet</h5>
+        <div><a href="/zimmet" class="btn btn-outline-secondary btn-sm">İptal</a>
+            <button class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Zimmet Oluştur</button></div>
+    </div>
+
+    <div class="card mb-3"><div class="card-body"><div class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold">Personel <span class="text-danger">*</span></label>
+            <select name="PersonelId" class="form-select form-select-sm" required>
+                <option value="">– Seçiniz –</option>
+                @foreach (var k in kullanicilar) { <option value="@k.Id">@k.AdSoyad (@AtomRoller.DisplayName(k.Rol))</option> }
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold">Depo <span class="text-danger">*</span></label>
+            <select name="DepoId" class="form-select form-select-sm" required>
+                @foreach (var d in depolar) { <option value="@d.Id">@d.Ad</option> }
+            </select>
+        </div>
+        <div class="col-md-4"><label class="form-label small fw-semibold">Teslim Yeri</label><input name="TeslimYeri" class="form-control form-control-sm"/></div>
+        <div class="col-12"><label class="form-label small fw-semibold">Açıklama</label><input name="Aciklama" class="form-control form-control-sm"/></div>
+    </div></div></div>
+
+    <div class="card">
+        <div class="card-header bg-white fw-semibold">
+            <i class="bi bi-upc-scan me-2"></i>Zimmetlenecek Taşınırlar (ambardaki tekil demirbaşlar)
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="max-height:420px;overflow:auto;">
+                <table class="table table-sm table-hover mb-0">
+                    <thead class="table-light" style="position:sticky;top:0;">
+                        <tr><th style="width:40px"></th><th>Cinsi</th><th>Barkod</th><th>Sicil No</th>
+                            <th>Seri No</th><th>Marka/Model</th><th>Depo</th></tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var t in uygun)
+                    {
+                        <tr>
+                            <td><input type="checkbox" name="tasinirKayitIds" value="@t.Id" class="form-check-input"/></td>
+                            <td>@t.Cinsi</td>
+                            <td class="small">@t.BarKod</td>
+                            <td class="small">@t.SicilNo</td>
+                            <td class="small text-muted">@t.SeriNo</td>
+                            <td class="small">@t.MarkaAdi @t.Modeli</td>
+                            <td class="small">@t.AmbarAdi</td>
+                        </tr>
+                    }
+                    @if (!uygun.Any())
+                    {
+                        <tr><td colspan="7" class="text-center text-muted py-4">Ambarda zimmete uygun tekil taşınır bulunmuyor.</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <p class="text-muted small mt-2"><i class="bi bi-info-circle me-1"></i>Seçilen taşınırlar "Zimmetli" durumuna geçer ve personelin üzerine tanımlanır.</p>
+</form>

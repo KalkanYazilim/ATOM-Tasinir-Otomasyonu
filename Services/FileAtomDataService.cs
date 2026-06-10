@@ -160,6 +160,24 @@ public class FileAtomDataService : IAtomDataService
         await YazAsync("tasinir-kayitlar", liste);
     }
 
+    // ── Stok Hareket ──────────────────────────────────────────
+    public Task<List<StokHareket>> StokHareketleriGetirAsync() => OkuAsync<StokHareket>("stok-hareketler");
+    public Task StokHareketKaydetAsync(StokHareket h) => UpsertAsync("stok-hareketler", h, x => x.Id);
+
+    // ── Sayım ─────────────────────────────────────────────────
+    public Task<List<SayimKaydi>> SayimlariGetirAsync() => OkuAsync<SayimKaydi>("sayimlar");
+    public async Task<SayimKaydi?> SayimGetirAsync(string id) => (await SayimlariGetirAsync()).FirstOrDefault(x => x.Id == id);
+    public Task SayimKaydetAsync(SayimKaydi s) => UpsertAsync("sayimlar", s, x => x.Id);
+
+    // ── Devir ─────────────────────────────────────────────────
+    public Task<List<DevirKaydi>> DevirleriGetirAsync() => OkuAsync<DevirKaydi>("devirler");
+    public async Task<DevirKaydi?> DevirGetirAsync(string id) => (await DevirleriGetirAsync()).FirstOrDefault(x => x.Id == id);
+    public Task DevirKaydetAsync(DevirKaydi d) => UpsertAsync("devirler", d, x => x.Id);
+
+    // ── Audit Log ─────────────────────────────────────────────
+    public Task<List<AuditLog>> AuditLoglariGetirAsync() => OkuAsync<AuditLog>("audit-loglar");
+    public Task AuditKaydetAsync(AuditLog log) => UpsertAsync("audit-loglar", log, x => x.Id);
+
     // ── Bildirim ──────────────────────────────────────────────
     public async Task<List<Bildirim>> BildirimleriGetirAsync(string kullaniciId)
         => (await OkuAsync<Bildirim>("bildirimler")).Where(b => b.AliciKullaniciId == kullaniciId).OrderByDescending(b => b.Tarih).ToList();

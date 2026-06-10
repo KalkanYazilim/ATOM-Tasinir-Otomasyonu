@@ -1,0 +1,120 @@
+@model ATOM.Models.Domain.MalKabul
+@using ATOM.Models.Domain
+@{
+    ViewData["Title"] = "Yeni Mal Kabul";
+    var ihaleler = ViewBag.Ihaleler as List<Ihale> ?? new();
+    var firmalar = ViewBag.Firmalar as Dictionary<string, string> ?? new();
+    var depolar = ViewBag.Depolar as List<Depo> ?? new();
+    var tanimlar = ViewBag.Tanimlar as Dictionary<string, string> ?? new();
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/depo/Home/MalKabuller">Mal Kabul</a></li>
+        <li class="breadcrumb-item active">Yeni</li>
+    </ol>
+}
+
+<form method="post" action="/depo/Home/YeniMalKabul">
+    @Html.AntiForgeryToken()
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0 fw-bold"><i class="bi bi-box-arrow-in-down me-2 text-primary"></i>Yeni Mal Kabul</h5>
+        <div><a href="/depo/Home/MalKabuller" class="btn btn-outline-secondary btn-sm">İptal</a>
+            <button class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Kaydet</button></div>
+    </div>
+
+    <div class="card mb-3"><div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label small fw-semibold">İhale (opsiyonel)</label>
+                <select name="IhaleId" class="form-select form-select-sm">
+                    <option value="">– Doğrudan giriş –</option>
+                    @foreach (var i in ihaleler)
+                    {
+                        if (Model.IhaleId == i.Id) { <option value="@i.Id" selected>@i.IhaleNo – @i.Baslik</option> }
+                        else { <option value="@i.Id">@i.IhaleNo – @i.Baslik</option> }
+                    }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small fw-semibold">Firma</label>
+                <select name="FirmaId" class="form-select form-select-sm">
+                    <option value="">– Seçiniz –</option>
+                    @foreach (var f in firmalar)
+                    {
+                        if (Model.FirmaId == f.Key) { <option value="@f.Key" selected>@f.Value</option> }
+                        else { <option value="@f.Key">@f.Value</option> }
+                    }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small fw-semibold">Depo <span class="text-danger">*</span></label>
+                <select name="DepoId" class="form-select form-select-sm" required>
+                    @foreach (var d in depolar) { <option value="@d.Id">@d.Ad</option> }
+                </select>
+            </div>
+            <div class="col-md-3"><label class="form-label small fw-semibold">İrsaliye No</label><input name="IrsaliyeNo" class="form-control form-control-sm"/></div>
+            <div class="col-md-3"><label class="form-label small fw-semibold">Fatura No</label><input name="FaturaNo" class="form-control form-control-sm"/></div>
+            <div class="col-md-3"><label class="form-label small fw-semibold">Fatura Tutarı (₺)</label><input name="FaturaTutari" type="number" step="0.01" value="0" class="form-control form-control-sm"/></div>
+            <div class="col-md-3"><label class="form-label small fw-semibold">Açıklama</label><input name="Aciklama" class="form-control form-control-sm"/></div>
+        </div>
+    </div></div>
+
+    <div class="card"><div class="card-header bg-white fw-semibold d-flex justify-content-between">
+        <span><i class="bi bi-list-ul me-2"></i>Kalemler</span>
+        <button type="button" class="btn btn-outline-primary btn-sm py-0" onclick="kalemEkle()"><i class="bi bi-plus"></i> Kalem Ekle</button>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm mb-0 align-middle">
+                <thead class="table-light"><tr>
+                    <th style="min-width:180px">Taşınır</th><th>Sipariş</th><th>Teslim</th><th>Kabul</th>
+                    <th>Birim Fiyat</th><th>Seri No</th><th>Marka</th><th>Model</th><th></th>
+                </tr></thead>
+                <tbody id="kalemBody">
+                @if (Model.Kalemler.Any())
+                {
+                    foreach (var k in Model.Kalemler)
+                    {
+                        <tr>
+                            <td><select name="tasinirIds" class="form-select form-select-sm">
+                                @foreach (var t in tanimlar) {
+                                    if (t.Key == k.TasinirTanimId) { <option value="@t.Key" selected>@t.Value</option> }
+                                    else { <option value="@t.Key">@t.Value</option> } }
+                            </select></td>
+                            <td><input name="siparisEdilen" type="number" value="@k.SiparisEdilen" class="form-control form-control-sm" style="width:75px"/></td>
+                            <td><input name="teslimEdilen" type="number" value="@k.SiparisEdilen" class="form-control form-control-sm" style="width:75px"/></td>
+                            <td><input name="kabulEdilen" type="number" value="@k.SiparisEdilen" class="form-control form-control-sm" style="width:75px"/></td>
+                            <td><input name="birimFiyatlar" type="number" step="0.01" value="0" class="form-control form-control-sm" style="width:95px"/></td>
+                            <td><input name="seriNolar" class="form-control form-control-sm" style="width:110px"/></td>
+                            <td><input name="markalar" class="form-control form-control-sm" style="width:90px"/></td>
+                            <td><input name="modeller" class="form-control form-control-sm" style="width:90px"/></td>
+                            <td><button type="button" class="btn btn-sm btn-outline-danger py-0" onclick="this.closest('tr').remove()">×</button></td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </div></div>
+</form>
+
+@section Scripts {
+<script>
+const tanimOpts = `@Html.Raw(string.Join("", tanimlar.Select(t => $"<option value='{t.Key}'>{System.Net.WebUtility.HtmlEncode(t.Value)}</option>")))`;
+function kalemEkle() {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td><select name="tasinirIds" class="form-select form-select-sm">${tanimOpts}</select></td>
+        <td><input name="siparisEdilen" type="number" value="1" class="form-control form-control-sm" style="width:75px"/></td>
+        <td><input name="teslimEdilen" type="number" value="1" class="form-control form-control-sm" style="width:75px"/></td>
+        <td><input name="kabulEdilen" type="number" value="1" class="form-control form-control-sm" style="width:75px"/></td>
+        <td><input name="birimFiyatlar" type="number" step="0.01" value="0" class="form-control form-control-sm" style="width:95px"/></td>
+        <td><input name="seriNolar" class="form-control form-control-sm" style="width:110px"/></td>
+        <td><input name="markalar" class="form-control form-control-sm" style="width:90px"/></td>
+        <td><input name="modeller" class="form-control form-control-sm" style="width:90px"/></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger py-0" onclick="this.closest('tr').remove()">×</button></td>`;
+    document.getElementById('kalemBody').appendChild(tr);
+}
+if (!document.querySelector('#kalemBody tr')) kalemEkle();
+</script>
+}

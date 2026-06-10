@@ -1,0 +1,113 @@
+@model ATOM.Models.Domain.Depo
+@using ATOM.Models.Domain
+@{
+    ViewData["Title"] = Model.Ad;
+    var tanimlar = ViewBag.Tanimlar as Dictionary<string, TasinirTanim> ?? new();
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+    var toplamDeger = Model.Stoklar.Sum(s => s.Miktar * s.BirimMaliyet);
+    var kritikler = Model.Stoklar.Where(s => s.MinEsik > 0 && s.Miktar <= s.MinEsik).ToList();
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/depo">Depolar</a></li>
+        <li class="breadcrumb-item active">@Model.Ad</li>
+    </ol>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-building me-2 text-primary"></i>@Model.Ad
+        <span class="text-muted fw-normal fs-6">· @Model.Kod</span>
+        @if (Model.MerkezDepoMu) { <span class="badge bg-warning text-dark ms-2">Merkez Depo</span> }
+    </h5>
+    <a href="/depo" class="btn btn-outline-secondary btn-sm">Geri</a>
+</div>
+
+<div class="row g-2 mb-3">
+    <div class="col-md-3"><div class="card stat-card info"><div class="card-body py-2">
+        <div class="text-muted small">Kalem Çeşidi</div><div class="fs-4 fw-bold">@Model.Stoklar.Count</div></div></div></div>
+    <div class="col-md-3"><div class="card stat-card success"><div class="card-body py-2">
+        <div class="text-muted small">Toplam Adet</div><div class="fs-4 fw-bold">@Model.Stoklar.Sum(s => s.Miktar).ToString("N0")</div></div></div></div>
+    <div class="col-md-3"><div class="card stat-card"><div class="card-body py-2">
+        <div class="text-muted small">Toplam Değer</div><div class="fs-4 fw-bold">@toplamDeger.ToString("C0", tr)</div></div></div></div>
+    <div class="col-md-3"><div class="card stat-card danger"><div class="card-body py-2">
+        <div class="text-muted small">Kritik Kalem</div><div class="fs-4 fw-bold text-danger">@kritikler.Count</div></div></div></div>
+</div>
+
+@if (kritikler.Any())
+{
+    <div class="alert alert-warning py-2">
+        <i class="bi bi-exclamation-triangle me-2"></i><strong>Kritik stok:</strong>
+        @string.Join(", ", kritikler.Select(s => $"{(tanimlar.TryGetValue(s.TasinirTanimId, out var t) ? t.Ad : s.TasinirTanimId)} ({s.Miktar})"))
+    </div>
+}
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header bg-white fw-semibold d-flex justify-content-between">
+                <span><i class="bi bi-card-list me-2 text-primary"></i>Stok Kartları</span>
+                <span class="text-muted small">@Model.Stoklar.Count kalem</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light">
+                            <tr><th>Taşınır</th><th class="text-center">Miktar</th><th class="text-center">Eşik</th>
+                                <th class="text-end">Birim Maliyet</th><th class="text-end">Toplam</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var s in Model.Stoklar.OrderByDescending(x => x.Miktar * x.BirimMaliyet))
+                        {
+                            var tanim = tanimlar.TryGetValue(s.TasinirTanimId, out var t) ? t : null;
+                            var kritik = s.MinEsik > 0 && s.Miktar <= s.MinEsik;
+                            <tr class="@(kritik ? "table-danger" : "")">
+                                <td>@(tanim?.Ad ?? s.TasinirTanimId)
+                                    @if (tanim?.DemirbasMi == true) { <span class="badge bg-secondary ms-1" style="font-size:.6rem;">Demirbaş</span> }
+                                </td>
+                                <td class="text-center fw-semibold">@s.Miktar @(tanim?.Birim ?? "")</td>
+                                <td class="text-center text-muted">@(s.MinEsik > 0 ? s.MinEsik.ToString() : "–")</td>
+                                <td class="text-end">@s.BirimMaliyet.ToString("C0", tr)</td>
+                                <td class="text-end fw-semibold">@((s.Miktar * s.BirimMaliyet).ToString("C0", tr))</td>
+                                <td><a class="btn btn-sm btn-outline-secondary py-0" href="/depo/Home/StokKart?depoId=@Model.Id&tanimId=@s.TasinirTanimId">Hareket</a></td>
+                            </tr>
+                        }
+                        @if (!Model.Stoklar.Any())
+                        {
+                            <tr><td colspan="6" class="text-center text-muted py-4">Bu depoda stok kaydı yok.</td></tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header bg-white fw-semibold"><i class="bi bi-pie-chart me-2 text-primary"></i>Değer Dağılımı</div>
+            <div class="card-body">
+                <canvas id="stokChart" height="220"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const ctx = document.getElementById('stokChart');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                Model.Stoklar.OrderByDescending(x => x.Miktar*x.BirimMaliyet).Take(8)
+                    .Select(s => tanimlar.TryGetValue(s.TasinirTanimId, out var t) ? t.Ad : s.TasinirTanimId))),
+            datasets: [{
+                data: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                    Model.Stoklar.OrderByDescending(x => x.Miktar*x.BirimMaliyet).Take(8)
+                        .Select(s => s.Miktar * s.BirimMaliyet))),
+                backgroundColor: ['#1a3a6b','#2d6a9f','#e8a020','#198754','#dc3545','#6f42c1','#0dcaf0','#6c757d']
+            }]
+        },
+        options: { plugins: { legend: { position: 'bottom', labels:{ font:{size:10} } } } }
+    });
+</script>
+}

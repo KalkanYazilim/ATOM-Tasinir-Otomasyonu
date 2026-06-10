@@ -1,0 +1,125 @@
+@model List<ATOM.Models.Domain.BakimKaydi>
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@using System.Security.Claims
+@{
+    ViewData["Title"] = "Bakım & Arıza";
+    var tanimlar = ViewBag.Tanimlar as Dictionary<string, string> ?? new();
+    var kullanicilar = ViewBag.Kullanicilar as Dictionary<string, string> ?? new();
+    var aktifZimmetler = ViewBag.AktifZimmetler as List<Zimmet> ?? new();
+    var rol = User.FindFirstValue(ClaimTypes.Role) ?? "";
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+    bool teknik = new[]{AtomRoller.Teknisyen,AtomRoller.IlMuduru,AtomRoller.IlDepoSorumlusu,AtomRoller.SistemAdmin}.Contains(rol);
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0"><li class="breadcrumb-item active">Bakım & Arıza</li></ol>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-tools me-2 text-primary"></i>Bakım & Arıza Kayıtları</h5>
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#arizaModal"><i class="bi bi-plus-lg me-1"></i>Arıza Bildir</button>
+</div>
+
+<div class="card"><div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+        <thead class="table-light">
+            <tr><th>Bakım No</th><th>Taşınır</th><th>Seri No</th><th>Arıza</th><th>Bildiren</th>
+                <th>Tarih</th><th class="text-end">Maliyet</th><th>Durum</th><th></th></tr>
+        </thead>
+        <tbody>
+        @foreach (var b in Model)
+        {
+            <tr>
+                <td class="fw-semibold">@b.BakimNo</td>
+                <td class="small">@(tanimlar.TryGetValue(b.TasinirTanimId, out var t) ? t : b.TasinirTanimId)</td>
+                <td class="small text-muted">@b.SeriNo</td>
+                <td class="small">@b.ArizaAciklama</td>
+                <td class="small">@(kullanicilar.TryGetValue(b.PersonelId, out var p) ? p : "–")</td>
+                <td class="small">@b.ArizaBildirmeTarihi.ToString("dd.MM.yyyy")</td>
+                <td class="text-end">@(b.BakimMaliyeti.HasValue ? b.BakimMaliyeti.Value.ToString("C0", tr) : "–")</td>
+                <td>
+                    @switch (b.Durum)
+                    {
+                        case BakimDurumu.Acik: <span class="badge bg-danger">Açık</span> break;
+                        case BakimDurumu.DevamEdiyor: <span class="badge bg-warning text-dark">Devam Ediyor</span> break;
+                        case BakimDurumu.Tamamlandi: <span class="badge bg-success">Tamamlandı</span> break;
+                        case BakimDurumu.Iptal: <span class="badge bg-secondary">İptal</span> break;
+                    }
+                </td>
+                <td>
+                    @if (teknik && b.Durum != BakimDurumu.Tamamlandi)
+                    {
+                        <button class="btn btn-sm btn-success py-0" data-bs-toggle="modal" data-bs-target="#tamamla@(b.Id)">Tamamla</button>
+                    }
+                </td>
+            </tr>
+            @if (teknik && b.Durum != BakimDurumu.Tamamlandi)
+            {
+                <div class="modal fade" id="tamamla@(b.Id)" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+                    <form method="post" action="/zimmet/Home/BakimTamamla">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@b.Id"/>
+                        <div class="modal-header"><h6 class="modal-title">@b.BakimNo – Bakım Tamamla</h6>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                        <div class="modal-body">
+                            <label class="form-label small fw-semibold">Yapılan İşlem</label>
+                            <textarea name="yapilanIslem" class="form-control form-control-sm mb-2" rows="2" required></textarea>
+                            <div class="row g-2">
+                                <div class="col-6"><label class="form-label small">Maliyet (₺)</label><input name="maliyet" type="number" step="0.01" value="0" class="form-control form-control-sm"/></div>
+                                <div class="col-6 d-flex align-items-end"><div class="form-check"><input type="checkbox" name="garantiKapsaminda" value="true" class="form-check-input" id="g@(b.Id)"/><label class="form-check-label small" for="g@(b.Id)">Garanti kapsamında</label></div></div>
+                            </div>
+                        </div>
+                        <div class="modal-footer"><button class="btn btn-success btn-sm">Tamamla</button></div>
+                    </form>
+                </div></div></div>
+            }
+        }
+        @if (!Model.Any())
+        {
+            <tr><td colspan="9" class="text-center text-muted py-4">Bakım/arıza kaydı yok.</td></tr>
+        }
+        </tbody>
+    </table>
+</div></div></div>
+
+<!-- Arıza Bildir Modal -->
+<div class="modal fade" id="arizaModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <form method="post" action="/zimmet/Home/ArizaBildir">
+        @Html.AntiForgeryToken()
+        <div class="modal-header"><h6 class="modal-title">Arıza Bildir</h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <label class="form-label small fw-semibold">Zimmet / Taşınır</label>
+            <select name="tasinirKayitId" id="arizaTasinir" class="form-select form-select-sm mb-2" onchange="arizaDoldur()">
+                <option value="">– Seçiniz –</option>
+                @foreach (var z in aktifZimmetler)
+                {
+                    foreach (var k in z.Kalemler.Where(x => x.ItemDurumu == ZimmetDurumu.Aktif))
+                    {
+                        <option value="@k.TasinirKayitId" data-tanim="@k.TasinirTanimId" data-seri="@k.SeriNo">
+                            @z.ZimmetNo – @k.Marka @k.Model (@k.SeriNo)
+                        </option>
+                    }
+                }
+            </select>
+            <input type="hidden" name="zimmetId" id="arizaZimmet"/>
+            <input type="hidden" name="tasinirTanimId" id="arizaTanim"/>
+            <input type="hidden" name="seriNo" id="arizaSeri"/>
+            <label class="form-label small fw-semibold">Arıza Açıklaması</label>
+            <textarea name="aciklama" class="form-control form-control-sm" rows="3" required></textarea>
+        </div>
+        <div class="modal-footer"><button class="btn btn-primary btn-sm">Bildir</button></div>
+    </form>
+</div></div></div>
+
+@section Scripts {
+<script>
+function arizaDopldur(){}
+function arizaDoldur() {
+    const sel = document.getElementById('arizaTasinir');
+    const opt = sel.options[sel.selectedIndex];
+    document.getElementById('arizaTanim').value = opt.getAttribute('data-tanim') || '';
+    document.getElementById('arizaSeri').value = opt.getAttribute('data-seri') || '';
+}
+</script>
+}

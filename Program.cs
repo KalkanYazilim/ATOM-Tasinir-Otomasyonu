@@ -5,6 +5,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddSingleton<IAtomDataService, FileAtomDataService>();
+builder.Services.AddScoped<IBildirimService, BildirimService>();
+builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IStokService, StokService>();
+builder.Services.AddScoped<ITasinirKayitService, TasinirKayitService>();
 builder.Services.AddHostedService<SeedDataHostedService>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

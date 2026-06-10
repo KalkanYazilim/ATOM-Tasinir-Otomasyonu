@@ -1,0 +1,85 @@
+@model List<ATOM.Models.Domain.MalKabul>
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@using System.Security.Claims
+@{
+    ViewData["Title"] = "Mal Kabul";
+    var firmalar = ViewBag.Firmalar as Dictionary<string, string> ?? new();
+    var depolar = ViewBag.Depolar as Dictionary<string, string> ?? new();
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+    var rol = User.FindFirstValue(ClaimTypes.Role) ?? "";
+    bool onayci = new[] { AtomRoller.MerkezDepoSorumlusu, AtomRoller.SistemAdmin, AtomRoller.BakanlikMerkez }.Contains(rol);
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0"><li class="breadcrumb-item active">Mal Kabul</li></ol>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-box-arrow-in-down me-2 text-primary"></i>Mal Kabul İşlemleri</h5>
+    <a href="/depo/Home/YeniMalKabul" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Yeni Mal Kabul</a>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                    <tr><th>Mal Kabul No</th><th>Firma</th><th>Depo</th><th>Teslim Tarihi</th>
+                        <th class="text-center">Kalem</th><th class="text-end">Fatura</th><th>Durum</th><th></th></tr>
+                </thead>
+                <tbody>
+                @foreach (var mk in Model)
+                {
+                    <tr>
+                        <td class="fw-semibold">@mk.MalKabulNo</td>
+                        <td class="small">@(firmalar.TryGetValue(mk.FirmaId, out var f) ? f : "–")</td>
+                        <td class="small">@(depolar.TryGetValue(mk.DepoId, out var d) ? d : "–")</td>
+                        <td class="small">@mk.TeslimTarihi.ToString("dd.MM.yyyy")</td>
+                        <td class="text-center">@mk.Kalemler.Count</td>
+                        <td class="text-end">@mk.FaturaTutari.ToString("C0", tr)</td>
+                        <td>
+                            @switch (mk.Durum)
+                            {
+                                case OnayDurumu.Bekliyor: <span class="badge bg-warning text-dark">Onay Bekliyor</span> break;
+                                case OnayDurumu.Onaylandi: <span class="badge bg-success">Onaylandı</span> break;
+                                case OnayDurumu.Reddedildi: <span class="badge bg-danger">Reddedildi</span> break;
+                            }
+                        </td>
+                        <td>
+                            @if (onayci && mk.Durum == OnayDurumu.Bekliyor)
+                            {
+                                <button class="btn btn-sm btn-success py-0" data-bs-toggle="modal" data-bs-target="#onayModal@(mk.Id)">Onayla</button>
+                            }
+                        </td>
+                    </tr>
+                    @if (onayci && mk.Durum == OnayDurumu.Bekliyor)
+                    {
+                        <div class="modal fade" id="onayModal@(mk.Id)" tabindex="-1">
+                          <div class="modal-dialog"><div class="modal-content">
+                            <form method="post" action="/depo/Home/MalKabulOnayla">
+                              @Html.AntiForgeryToken()
+                              <input type="hidden" name="id" value="@mk.Id"/>
+                              <div class="modal-header"><h6 class="modal-title">@mk.MalKabulNo – Onay</h6>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                              <div class="modal-body">
+                                <p class="small text-muted">Onaylandığında stok artar, demirbaşlar için tekil taşınır kaydı üretilir.</p>
+                                <textarea name="aciklama" class="form-control form-control-sm" rows="2" placeholder="Açıklama (zorunlu)" required></textarea>
+                              </div>
+                              <div class="modal-footer">
+                                <button type="submit" name="onayla" value="false" class="btn btn-outline-danger btn-sm">Reddet</button>
+                                <button type="submit" name="onayla" value="true" class="btn btn-success btn-sm">Onayla</button>
+                              </div>
+                            </form>
+                          </div></div>
+                        </div>
+                    }
+                }
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="8" class="text-center text-muted py-4">Mal kabul kaydı yok.</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

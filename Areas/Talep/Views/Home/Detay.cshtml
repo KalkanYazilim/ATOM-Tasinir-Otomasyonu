@@ -73,7 +73,7 @@
                                 <tr>
                                     <td>@(tanimlar.TryGetValue(k.TasinirTanimId, out var ad) ? ad : k.TasinirTanimId)</td>
                                     <td class="text-center fw-semibold">@k.TalepMiktari</td>
-                                    <td class="text-center">@(k.KarsilananMiktar.HasValue ? k.KarsilananMiktar.Value.ToString() : "–")</td>
+                                    <td class="text-center">@(k.KarsilananMiktar > 0 ? k.KarsilananMiktar.ToString() : "–")</td>
                                     <td class="text-muted small">@k.Aciklama</td>
                                 </tr>
                             }

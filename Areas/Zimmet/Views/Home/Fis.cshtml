@@ -1,0 +1,78 @@
+@model ATOM.Models.Domain.Zimmet
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@{
+    Layout = null;
+    var personel = ViewBag.Personel as AtomKullanici;
+    var veren = ViewBag.Veren as AtomKullanici;
+    var depo = ViewBag.Depo as Depo;
+    var kurum = ViewBag.Kurum as Kurum;
+}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8"/>
+    <title>Zimmet Fişi – @Model.ZimmetNo</title>
+    <style>
+        body { font-family: 'Times New Roman', serif; font-size: 12pt; margin: 2cm; color:#000; }
+        h2 { text-align: center; margin-bottom: 4px; }
+        .ust { text-align:center; margin-bottom: 18px; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { border: 1px solid #000; padding: 5px 7px; font-size: 11pt; }
+        th { background: #eee; }
+        .bilgi td { border: none; padding: 2px 4px; }
+        .imza { margin-top: 50px; display: flex; justify-content: space-between; }
+        .imza div { text-align: center; width: 45%; }
+        .imza .line { margin-top: 50px; border-top: 1px solid #000; padding-top: 4px; }
+        @@media print { .no-print { display: none; } body { margin: 1cm; } }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="text-align:right;margin-bottom:10px;">
+        <button onclick="window.print()" style="padding:6px 16px;">🖨 Yazdır</button>
+    </div>
+
+    <div class="ust">
+        <strong>@(kurum?.Ad ?? "T.C. ........... BAKANLIĞI")</strong><br/>
+        @(depo?.Ad)
+    </div>
+    <h2>TAŞINIR TESLİM (ZİMMET) BELGESİ</h2>
+
+    <table class="bilgi">
+        <tr><td style="width:50%"><strong>Zimmet No:</strong> @Model.ZimmetNo</td>
+            <td><strong>Tarih:</strong> @Model.ZimmetTarihi.ToString("dd.MM.yyyy")</td></tr>
+        <tr><td><strong>Teslim Alan:</strong> @(personel?.AdSoyad)</td>
+            <td><strong>Görev/Birim:</strong> @(personel != null ? AtomRoller.DisplayName(personel.Rol) : "")</td></tr>
+        <tr><td><strong>Teslim Eden:</strong> @(veren?.AdSoyad)</td>
+            <td><strong>Teslim Yeri:</strong> @Model.TeslimYeri</td></tr>
+    </table>
+
+    <table>
+        <thead>
+            <tr><th>S.No</th><th>Cinsi</th><th>Marka/Model</th><th>Sicil No</th><th>Barkod</th><th>Seri No</th><th>Adet</th></tr>
+        </thead>
+        <tbody>
+        @{ int sira = 1; }
+        @foreach (var k in Model.Kalemler)
+        {
+            <tr>
+                <td style="text-align:center">@(sira++)</td>
+                <td>@k.Marka @k.Model</td>
+                <td>@k.Marka @k.Model</td>
+                <td>@k.SicilNo</td>
+                <td>@k.Barkod</td>
+                <td>@k.SeriNo</td>
+                <td style="text-align:center">@k.Miktar</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+
+    <p style="font-size:10pt;">Yukarıda cinsi ve miktarı yazılı taşınır(lar) tarafıma teslim edilmiş olup, korunmasından sorumlu olduğumu kabul ederim.</p>
+
+    <div class="imza">
+        <div><div class="line">Teslim Eden<br/>@(veren?.AdSoyad)</div></div>
+        <div><div class="line">Teslim Alan<br/>@(personel?.AdSoyad)</div></div>
+    </div>
+</body>
+</html>

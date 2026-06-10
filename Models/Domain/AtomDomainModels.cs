@@ -63,6 +63,8 @@ public class TasinirTanim
     public string Aciklama { get; set; } = "";
     public TasinirKategori Kategori { get; set; }
     public string Birim { get; set; } = "Adet";      // Adet, Kg, Lt, M2 ...
+    public bool DemirbasMi { get; set; }              // true = tekil sicil/barkod izlenir; false = sarf
+    public int KritikEsik { get; set; }               // varsayılan kritik stok eşiği
     public bool AktifMi { get; set; } = true;
     public List<string> EtiketListesi { get; set; } = new();
 }
@@ -108,11 +110,14 @@ public class IhtiyacTalebi
     public DateTime TalepTarihi { get; set; } = DateTime.UtcNow;
     public string GerekceAciklama { get; set; } = "";
     public string OncelikSeviyesi { get; set; } = "Normal"; // Acil, Yüksek, Normal, Düşük
+    public DateTime? IstenenTeslimTarihi { get; set; }
     public TalepDurumu Durum { get; set; } = TalepDurumu.Taslak;
     public List<TalepKalemi> Kalemler { get; set; } = new();
     public List<OnayKaydi> OnayGecmisi { get; set; } = new();
     public List<string> EkDosyalar { get; set; } = new();
     public string? BaglantiliIhaleId { get; set; }
+    public List<string> BaglantiliSevkIds { get; set; } = new();
+    public string KarsilamaTuru { get; set; } = ""; // Stoktan / Sevk / Satınalma / Kısmi
     public string? RedGerekce { get; set; }
     public DateTime? BakanlikAlinmaTarihi { get; set; }
     public DateTime? KapanmaTarihi { get; set; }
@@ -122,7 +127,9 @@ public class TalepKalemi
 {
     public string TasinirTanimId { get; set; } = "";
     public int TalepMiktari { get; set; }
-    public int? KarsilananMiktar { get; set; }
+    public int KarsilananMiktar { get; set; }
+    public int BekleyenMiktar => Math.Max(0, TalepMiktari - KarsilananMiktar);
+    public string KullanimYeri { get; set; } = "";
     public string Aciklama { get; set; } = "";
     public string TeknikOzellik { get; set; } = "";
 }
@@ -144,15 +151,31 @@ public class Ihale
     public DateTime? SonuclanmaTarihi { get; set; }
     public string OlusturanKullaniciId { get; set; } = "";
     public string TeknikSartname { get; set; } = "";
+    public string SatinalmaDosyaNo { get; set; } = "";
+    public string Yontem { get; set; } = "Açık İhale"; // Açık İhale, Pazarlık, Doğrudan Temin
+    public decimal YaklasikMaliyet { get; set; }
     public decimal TahminiButce { get; set; }
+    public string ButceTertibi { get; set; } = "";
+    public List<KomisyonUyesi> KomisyonUyeleri { get; set; } = new();
     public List<IhaleKalemi> Kalemler { get; set; } = new();
     public List<string> KaynaklananTalepIds { get; set; } = new();
     public List<IhaleTeklif> Teklifler { get; set; } = new();
     public string? KazananFirmaId { get; set; }
     public string? KazananTeklifId { get; set; }
     public List<OnayKaydi> OnayGecmisi { get; set; } = new();
+    public string SozlesmeNo { get; set; } = "";
+    public DateTime? SozlesmeTarihi { get; set; }
     public string? SozlesmeDosyasi { get; set; }
+    public string TeslimTakvimi { get; set; } = "";
+    public string TeminatBilgisi { get; set; } = "";
     public string? IptalGerekce { get; set; }
+}
+
+public class KomisyonUyesi
+{
+    public string KullaniciId { get; set; } = "";
+    public string AdSoyad { get; set; } = "";
+    public string Gorev { get; set; } = "Üye"; // Başkan / Üye / Yedek
 }
 
 public class IhaleKalemi
@@ -173,6 +196,12 @@ public class IhaleTeklif
     public string Aciklama { get; set; } = "";
     public List<TeklifKalemi> Kalemler { get; set; } = new();
     public string? DegerlendirmeNotu { get; set; }
+    // Değerlendirme puanları (0-100)
+    public double TeknikUygunlukPuani { get; set; }
+    public double FiyatPuani { get; set; }
+    public double TeslimPuani { get; set; }
+    public double GarantiPuani { get; set; }
+    public double GenelPuan { get; set; }
 }
 
 public class TeklifKalemi
@@ -203,10 +232,16 @@ public class MalKabul
     public List<MalKabulKalemi> Kalemler { get; set; } = new();
     public OnayDurumu Durum { get; set; } = OnayDurumu.Bekliyor;
     public List<OnayKaydi> OnayGecmisi { get; set; } = new();
+    public List<KomisyonUyesi> MuayeneKomisyonUyeleri { get; set; } = new();
     public string IrsaliyeNo { get; set; } = "";
     public string FaturaNo { get; set; } = "";
+    public DateTime? FaturaTarihi { get; set; }
     public decimal FaturaTutari { get; set; }
+    public decimal KdvTutari { get; set; }
+    public string TifNo { get; set; } = "";
+    public string SozlesmeNo { get; set; } = "";
     public string? Aciklama { get; set; }
+    public bool TasinirKayitUretildiMi { get; set; }
 }
 
 public class MalKabulKalemi
@@ -219,8 +254,12 @@ public class MalKabulKalemi
     public string? RedGerekce { get; set; }
     public decimal BirimFiyat { get; set; }
     public string SeriNo { get; set; } = "";
+    public List<string> SeriNoListesi { get; set; } = new();
+    public List<string> BarkodListesi { get; set; } = new();
     public string Marka { get; set; } = "";
     public string Model { get; set; } = "";
+    public bool DemirbasMi { get; set; }
+    public DateTime? GarantiBaslangicTarihi { get; set; }
     public DateTime? GarantiBitisTarihi { get; set; }
 }
 
@@ -241,6 +280,8 @@ public class Sevk
     public SevkDurumu Durum { get; set; } = SevkDurumu.Hazirlaniyor;
     public string OlusturanKullaniciId { get; set; } = "";
     public string? TasimaciAdi { get; set; }
+    public string? TasimaciTelefon { get; set; }
+    public string? AracPlaka { get; set; }
     public string? IrsaliyeNo { get; set; }
     public List<SevkKalemi> Kalemler { get; set; } = new();
     public List<OnayKaydi> OnayGecmisi { get; set; } = new();
@@ -253,6 +294,8 @@ public class SevkKalemi
     public string TasinirTanimId { get; set; } = "";
     public int Miktar { get; set; }
     public int? TeslimAlinan { get; set; }
+    public int? HasarliMiktar { get; set; }
+    public List<string> TasinirKayitIds { get; set; } = new(); // sevk edilen tekil demirbaşlar
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -269,20 +312,26 @@ public class Zimmet
     public DateTime ZimmetTarihi { get; set; } = DateTime.UtcNow;
     public ZimmetDurumu Durum { get; set; } = ZimmetDurumu.Aktif;
     public List<ZimmetKalemi> Kalemler { get; set; } = new();
-    public string? IadeTarihi { get; set; }
+    public DateTime? IadeTarihi { get; set; }
     public string? IadeAciklama { get; set; }
+    public string TeslimAlanImzaDurumu { get; set; } = "Bekliyor"; // Bekliyor / İmzalandı
+    public string TeslimYeri { get; set; } = "";
     public string? Aciklama { get; set; }
     public List<OnayKaydi> OnayGecmisi { get; set; } = new();
 }
 
 public class ZimmetKalemi
 {
+    public string? TasinirKayitId { get; set; }      // tekil demirbaş bağı
     public string TasinirTanimId { get; set; } = "";
     public int Miktar { get; set; }
     public string SeriNo { get; set; } = "";
+    public string Barkod { get; set; } = "";
+    public string SicilNo { get; set; } = "";
     public string Marka { get; set; } = "";
     public string Model { get; set; } = "";
     public ZimmetDurumu ItemDurumu { get; set; } = ZimmetDurumu.Aktif;
+    public string? HasarAciklama { get; set; }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -321,17 +370,26 @@ public class HurdaKaydi
     public string TalepEdenId { get; set; } = "";
     public DateTime TalepTarihi { get; set; } = DateTime.UtcNow;
     public HurdaDurumu Durum { get; set; } = HurdaDurumu.Talep;
+    public string DusumTuru { get; set; } = "Hurda"; // Hurda / Kayıp / Düşüm / İmha / Satış / Devir
+    public string? DepoId { get; set; }
     public List<HurdaKalemi> Kalemler { get; set; } = new();
     public string Gerekce { get; set; } = "";
+    public List<KomisyonUyesi> KomisyonUyeleri { get; set; } = new();
     public DateTime? KomisyonTarihi { get; set; }
     public string? KomisyonKarari { get; set; }
+    public string? EkspertizRaporu { get; set; }
     public DateTime? ImhaTarihi { get; set; }
     public string? ImhaSekli { get; set; }
+    public string? ImhaTutanagi { get; set; }
+    public decimal? SatisBedeli { get; set; }
+    public string? OnayMakami { get; set; }
+    public string TifNo { get; set; } = "";
     public List<OnayKaydi> OnayGecmisi { get; set; } = new();
 }
 
 public class HurdaKalemi
 {
+    public string? TasinirKayitId { get; set; }
     public string TasinirTanimId { get; set; } = "";
     public int Miktar { get; set; }
     public string SeriNo { get; set; } = "";
@@ -474,4 +532,5 @@ public class Bildirim
     public string? LinkUrl { get; set; }
     public string? KaynakId { get; set; }
     public string? KaynakTur { get; set; }
+    public string Oncelik { get; set; } = "Normal"; // Acil / Yüksek / Normal / Düşük
 }

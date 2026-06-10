@@ -75,6 +75,24 @@ public interface IAtomDataService
     Task TasinirKayitlariTopluKaydetAsync(IEnumerable<TasinirKayit> kayitlar);
     Task TasinirKayitSilAsync(string id);
 
+    // ── Stok Hareket ──────────────────────────────────────────
+    Task<List<StokHareket>> StokHareketleriGetirAsync();
+    Task StokHareketKaydetAsync(StokHareket hareket);
+
+    // ── Sayım ─────────────────────────────────────────────────
+    Task<List<SayimKaydi>> SayimlariGetirAsync();
+    Task<SayimKaydi?> SayimGetirAsync(string id);
+    Task SayimKaydetAsync(SayimKaydi sayim);
+
+    // ── Devir ─────────────────────────────────────────────────
+    Task<List<DevirKaydi>> DevirleriGetirAsync();
+    Task<DevirKaydi?> DevirGetirAsync(string id);
+    Task DevirKaydetAsync(DevirKaydi devir);
+
+    // ── Audit Log ─────────────────────────────────────────────
+    Task<List<AuditLog>> AuditLoglariGetirAsync();
+    Task AuditKaydetAsync(AuditLog log);
+
     // ── Bildirim ──────────────────────────────────────────────
     Task<List<Bildirim>> BildirimleriGetirAsync(string kullaniciId);
     Task BildirimKaydetAsync(Bildirim bildirim);
