@@ -16,11 +16,30 @@ public class HomeController : Controller
     private readonly ITasinirKayitService _kayit;
     private readonly IBildirimService _bildirim;
     private readonly IAuditService _audit;
+    private readonly BelgeService _belge;
 
     public HomeController(IAtomDataService svc, IStokService stok,
-        ITasinirKayitService kayit, IBildirimService bildirim, IAuditService audit)
+        ITasinirKayitService kayit, IBildirimService bildirim, IAuditService audit, BelgeService belge)
     {
-        _svc = svc; _stok = stok; _kayit = kayit; _bildirim = bildirim; _audit = audit;
+        _svc = svc; _stok = stok; _kayit = kayit; _bildirim = bildirim; _audit = audit; _belge = belge;
+    }
+
+    public async Task<IActionResult> DevirFisi(string id)
+    {
+        var d = await _svc.DevirGetirAsync(id);
+        if (d == null) return NotFound();
+        var tanimlar = await _svc.TasinirTanimlariGetirAsync();
+        var kurumlar = await _svc.KurumlariGetirAsync();
+        var kaynak = kurumlar.FirstOrDefault(k => k.Id == d.KaynakKurumId)?.Ad;
+        var hedef = kurumlar.FirstOrDefault(k => k.Id == d.HedefKurumId)?.Ad;
+        var basliklar = new List<string> { "S.No", "Taşınır", "Miktar", "Birim Maliyet" };
+        int sira = 0;
+        var satirlar = d.Kalemler.Select(k => (IList<string>)new List<string>
+        { (++sira).ToString(), tanimlar.FirstOrDefault(t => t.Id == k.TasinirTanimId)?.Ad ?? k.TasinirTanimId, k.Miktar.ToString(), k.BirimMaliyet.ToString("N2") });
+        var bytes = _belge.WordTablo("BEDELSİZ DEVİR FİŞİ",
+            $"Devir No: {d.DevirNo} · Tür: {d.Tur} · {kaynak} → {hedef} · Tarih: {d.DevirTarihi:dd.MM.yyyy}",
+            basliklar, satirlar, "Dayanak: Taşınır Mal Yönetmeliği Genel Tebliği (Sayı:1) – İhtiyaç Fazlası Taşınır Devri");
+        return File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", $"Devir-{d.DevirNo}.docx");
     }
 
     private string KullaniciId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;

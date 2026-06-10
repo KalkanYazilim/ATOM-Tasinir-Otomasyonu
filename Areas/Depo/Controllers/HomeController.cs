@@ -16,11 +16,12 @@ public class HomeController : Controller
     private readonly ITasinirKayitService _kayit;
     private readonly IBildirimService _bildirim;
     private readonly IAuditService _audit;
+    private readonly BelgeService _belge;
 
     public HomeController(IAtomDataService svc, IStokService stok,
-        ITasinirKayitService kayit, IBildirimService bildirim, IAuditService audit)
+        ITasinirKayitService kayit, IBildirimService bildirim, IAuditService audit, BelgeService belge)
     {
-        _svc = svc; _stok = stok; _kayit = kayit; _bildirim = bildirim; _audit = audit;
+        _svc = svc; _stok = stok; _kayit = kayit; _bildirim = bildirim; _audit = audit; _belge = belge;
     }
 
     private string KullaniciId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
@@ -54,6 +55,49 @@ public class HomeController : Controller
         var tanimlar = await _svc.TasinirTanimlariGetirAsync();
         ViewBag.Tanimlar = tanimlar.ToDictionary(t => t.Id, t => t);
         return View(depo);
+    }
+
+    // ─── Resmi Belgeler (Word) ────────────────────────────────
+    public async Task<IActionResult> TifBelge(string id)
+    {
+        var mk = await _svc.MalKabulGetirAsync(id);
+        if (mk == null) return NotFound();
+        var tanimlar = await _svc.TasinirTanimlariGetirAsync();
+        var depo = await _svc.DepoGetirAsync(mk.DepoId);
+        var basliklar = new List<string> { "S.No", "Taşınır", "Sipariş", "Teslim", "Kabul", "Red", "Birim Fiyat", "Tutar" };
+        int sira = 0;
+        var satirlar = mk.Kalemler.Select(k => (IList<string>)new List<string>
+        {
+            (++sira).ToString(),
+            tanimlar.FirstOrDefault(t => t.Id == k.TasinirTanimId)?.Ad ?? k.TasinirTanimId,
+            k.SiparisEdilen.ToString(), k.TeslimEdilen.ToString(), k.KabulEdilen.ToString(),
+            k.Reddedilen.ToString(), k.BirimFiyat.ToString("N2"), (k.KabulEdilen * k.BirimFiyat).ToString("N2")
+        });
+        var bytes = _belge.WordTablo("TAŞINIR İŞLEM FİŞİ (TİF)",
+            $"TİF No: {mk.TifNo} · Mal Kabul: {mk.MalKabulNo} · Depo: {depo?.Ad} · Tarih: {mk.TeslimTarihi:dd.MM.yyyy}",
+            basliklar, satirlar, "Dayanak: Taşınır Mal Yönetmeliği – Taşınır İşlem Fişi (Giriş)");
+        return File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", $"TIF-{mk.MalKabulNo}.docx");
+    }
+
+    public async Task<IActionResult> SevkIrsaliye(string id)
+    {
+        var sevk = await _svc.SevkGetirAsync(id);
+        if (sevk == null) return NotFound();
+        var tanimlar = await _svc.TasinirTanimlariGetirAsync();
+        var depolar = await _svc.DepolariGetirAsync();
+        var kaynak = depolar.FirstOrDefault(d => d.Id == sevk.KaynakDepoId)?.Ad;
+        var hedef = depolar.FirstOrDefault(d => d.Id == sevk.HedefDepoId)?.Ad;
+        var basliklar = new List<string> { "S.No", "Taşınır", "Miktar", "Teslim Alınan" };
+        int sira = 0;
+        var satirlar = sevk.Kalemler.Select(k => (IList<string>)new List<string>
+        {
+            (++sira).ToString(), tanimlar.FirstOrDefault(t => t.Id == k.TasinirTanimId)?.Ad ?? k.TasinirTanimId,
+            k.Miktar.ToString(), (k.TeslimAlinan?.ToString() ?? "-")
+        });
+        var bytes = _belge.WordTablo("SEVK İRSALİYESİ",
+            $"Sevk No: {sevk.SevkNo} · {kaynak} → {hedef} · Taşıyıcı: {sevk.TasimaciAdi} · Plaka: {sevk.AracPlaka} · Tarih: {sevk.SevkTarihi:dd.MM.yyyy}",
+            basliklar, satirlar, "Dayanak: Taşınır Mal Yönetmeliği – Taşınır İşlem Fişi (Çıkış/Sevk)");
+        return File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", $"Sevk-{sevk.SevkNo}.docx");
     }
 
     // ─── Stok Kartı / Hareket Geçmişi ─────────────────────────

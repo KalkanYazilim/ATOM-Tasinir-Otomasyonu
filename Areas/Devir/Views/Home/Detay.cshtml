@@ -17,8 +17,11 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h5 class="mb-0 fw-bold"><i class="bi bi-arrow-left-right me-2 text-primary"></i>@Model.DevirNo
         <span class="badge bg-secondary ms-1">@Model.Tur</span></h5>
-    @if (alanOnayci && Model.Durum == DevirDurumu.AlanOnayiBekliyor)
-    { <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#onayModal">Alan Onayı</button> }
+    <div class="d-flex gap-2">
+        <a href="/devir/Home/DevirFisi/@Model.Id" class="btn btn-outline-primary btn-sm"><i class="bi bi-file-earmark-word me-1"></i>Devir Fişi</a>
+        @if (alanOnayci && Model.Durum == DevirDurumu.AlanOnayiBekliyor)
+        { <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#onayModal">Alan Onayı</button> }
+    </div>
 </div>
 
 <div class="row g-3">

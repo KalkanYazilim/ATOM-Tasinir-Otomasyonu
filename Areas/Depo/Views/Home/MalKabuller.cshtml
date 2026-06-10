@@ -46,6 +46,10 @@
                             }
                         </td>
                         <td>
+                            @if (mk.Durum == OnayDurumu.Onaylandi)
+                            {
+                                <a href="/depo/Home/TifBelge/@mk.Id" class="btn btn-sm btn-outline-primary py-0" title="TİF"><i class="bi bi-file-earmark-word"></i></a>
+                            }
                             @if (onayci && mk.Durum == OnayDurumu.Bekliyor)
                             {
                                 <button class="btn btn-sm btn-success py-0" data-bs-toggle="modal" data-bs-target="#onayModal@(mk.Id)">Onayla</button>

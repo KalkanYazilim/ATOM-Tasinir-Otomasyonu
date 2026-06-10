@@ -47,6 +47,7 @@
                         }
                     </td>
                     <td>
+                        <a href="/depo/Home/SevkIrsaliye/@s.Id" class="btn btn-sm btn-outline-primary py-0" title="İrsaliye"><i class="bi bi-file-earmark-word"></i></a>
                         @if (s.Durum != SevkDurumu.TeslimEdildi && s.Durum != SevkDurumu.Reddedildi)
                         {
                             <button class="btn btn-sm btn-success py-0" data-bs-toggle="modal" data-bs-target="#teslim@(s.Id)">Teslim Al</button>

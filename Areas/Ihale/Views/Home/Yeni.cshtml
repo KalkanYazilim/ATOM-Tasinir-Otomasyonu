@@ -26,8 +26,33 @@
                     <input type="text" name="Baslik" class="form-control" required placeholder="Örn: 2026 Yılı Yazıcı Alımı"/>
                 </div>
                 <div class="col-md-4">
+                    <label class="form-label fw-semibold">İhale Yöntemi</label>
+                    <select name="Yontem" class="form-select">
+                        <option>Açık İhale</option>
+                        <option>Belli İstekliler Arası</option>
+                        <option>Pazarlık</option>
+                        <option>Doğrudan Temin</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Satınalma Dosya No</label>
+                    <input type="text" name="SatinalmaDosyaNo" class="form-control" placeholder="SA-2026-..."/>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Yaklaşık Maliyet (₺)</label>
+                    <input type="number" name="YaklasikMaliyet" class="form-control" min="0" step="0.01"/>
+                </div>
+                <div class="col-md-4">
                     <label class="form-label fw-semibold">Tahmini Bütçe (₺)</label>
                     <input type="number" name="TahminiButce" class="form-control" min="0" step="0.01"/>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Bütçe Tertibi</label>
+                    <input type="text" name="ButceTertibi" class="form-control" placeholder="03.7.1.01"/>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label fw-semibold">Teslim Takvimi</label>
+                    <input type="text" name="TeslimTakvimi" class="form-control" placeholder="Sözleşme imzasından itibaren 30 gün"/>
                 </div>
                 <div class="col-12">
                     <label class="form-label fw-semibold">Teknik Şartname</label>
