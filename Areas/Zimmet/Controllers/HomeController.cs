@@ -15,11 +15,13 @@ public class HomeController : Controller
     private readonly ITasinirKayitService _kayit;
     private readonly IBildirimService _bildirim;
     private readonly IAuditService _audit;
+    private readonly IImzaService _imza;
+    private readonly BelgeService _belge;
 
     public HomeController(IAtomDataService svc, ITasinirKayitService kayit,
-        IBildirimService bildirim, IAuditService audit)
+        IBildirimService bildirim, IAuditService audit, IImzaService imza, BelgeService belge)
     {
-        _svc = svc; _kayit = kayit; _bildirim = bildirim; _audit = audit;
+        _svc = svc; _kayit = kayit; _bildirim = bildirim; _audit = audit; _imza = imza; _belge = belge;
     }
 
     private string KullaniciId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
@@ -215,8 +217,41 @@ public class HomeController : Controller
         ViewBag.Personel = personel;
         ViewBag.Veren = kullanicilar.FirstOrDefault(k => k.Id == zimmet.VerenKullaniciId);
         ViewBag.Depo = depo;
-        ViewBag.Kurum = kurumlar.FirstOrDefault(k => k.Id == (depo?.KurumId));
+        var kurum = kurumlar.FirstOrDefault(k => k.Id == (depo?.KurumId));
+        ViewBag.Kurum = kurum;
+
+        // Elektronik onay/imza (5070): yoksa üret
+        var mevcutImza = (await _svc.ImzalariGetirAsync()).FirstOrDefault(i => i.BelgeId == zimmet.Id && i.BelgeTuru == "ZimmetFisi");
+        if (mevcutImza == null)
+        {
+            var icerik = $"{zimmet.ZimmetNo}|{zimmet.PersonelId}|{string.Join(",", zimmet.Kalemler.Select(k => k.SicilNo))}|{zimmet.ZimmetTarihi:o}";
+            mevcutImza = await _imza.BelgeImzalaAsync(User, "ZimmetFisi", zimmet.Id, zimmet.ZimmetNo, icerik, kurum?.Ad ?? "");
+        }
+        ViewBag.Imza = mevcutImza;
         return View(zimmet);
+    }
+
+    // ─── Zimmet Fişi Word (.docx) ─────────────────────────────
+    public async Task<IActionResult> FisWord(string id)
+    {
+        var zimmet = await _svc.ZimmetGetirAsync(id);
+        if (zimmet == null) return NotFound();
+        if (Rol == AtomRoller.Personel && zimmet.PersonelId != KullaniciId) return Forbid();
+        var kullanicilar = await _svc.KullanicilariGetirAsync();
+        var personel = kullanicilar.FirstOrDefault(k => k.Id == zimmet.PersonelId);
+
+        var basliklar = new List<string> { "S.No", "Cinsi", "Marka/Model", "Sicil No", "Barkod", "Seri No" };
+        int sira = 0;
+        var satirlar = zimmet.Kalemler.Select(k => (IList<string>)new List<string>
+        { (++sira).ToString(), k.Marka, $"{k.Marka} {k.Model}", k.SicilNo, k.Barkod, k.SeriNo });
+
+        var icerik = $"{zimmet.ZimmetNo}|{zimmet.PersonelId}|{zimmet.ZimmetTarihi:o}";
+        var imza = (await _svc.ImzalariGetirAsync()).FirstOrDefault(i => i.BelgeId == zimmet.Id && i.BelgeTuru == "ZimmetFisi")
+                   ?? await _imza.BelgeImzalaAsync(User, "ZimmetFisi", zimmet.Id, zimmet.ZimmetNo, icerik, "");
+        var bytes = _belge.WordTablo("TAŞINIR TESLİM (ZİMMET) BELGESİ",
+            $"Zimmet No: {zimmet.ZimmetNo} · Teslim Alan: {personel?.AdSoyad} · Tarih: {zimmet.ZimmetTarihi:dd.MM.yyyy}",
+            basliklar, satirlar, "Dayanak: Taşınır Mal Yönetmeliği – Zimmet Fişi", imza.DogrulamaKodu);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", $"zimmet-{zimmet.ZimmetNo}.docx");
     }
 
     // ─── Bakım / Arıza ────────────────────────────────────────

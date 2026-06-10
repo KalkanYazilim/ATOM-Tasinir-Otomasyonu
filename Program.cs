@@ -10,6 +10,7 @@ builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IStokService, StokService>();
 builder.Services.AddScoped<ITasinirKayitService, TasinirKayitService>();
 builder.Services.AddScoped<IDosyaService, DosyaService>();
+builder.Services.AddScoped<IImzaService, ImzaService>();
 builder.Services.AddSingleton<BelgeService>();
 builder.Services.AddHostedService<SeedDataHostedService>();
 
@@ -50,6 +51,7 @@ app.MapAreaControllerRoute("zimmet", "Zimmet", "zimmet/{controller=Home}/{action
 app.MapAreaControllerRoute("hurda", "Hurda", "hurda/{controller=Home}/{action=Index}/{id?}");
 app.MapAreaControllerRoute("sayim", "Sayim", "sayim/{controller=Home}/{action=Index}/{id?}");
 app.MapAreaControllerRoute("devir", "Devir", "devir/{controller=Home}/{action=Index}/{id?}");
+app.MapAreaControllerRoute("tasit", "Tasit", "tasit/{controller=Home}/{action=Index}/{id?}");
 app.MapAreaControllerRoute("raporlama", "Raporlama", "raporlama/{controller=Home}/{action=Index}/{id?}");
 app.MapAreaControllerRoute("yonetim", "Yonetim", "yonetim/{controller=Home}/{action=Index}/{id?}");
 app.MapControllerRoute("default", "{controller=Dashboard}/{action=Index}/{id?}");

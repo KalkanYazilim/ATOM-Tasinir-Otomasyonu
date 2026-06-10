@@ -1,0 +1,58 @@
+@model ATOM.Models.Domain.Tasit
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@{
+    ViewData["Title"] = string.IsNullOrEmpty(Model.Id) ? "Yeni Taşıt" : "Taşıt Düzenle";
+    var kullanicilar = ViewBag.Kullanicilar as List<AtomKullanici> ?? new();
+    string Dt(DateTime? t) => t?.ToString("yyyy-MM-dd") ?? "";
+}
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/tasit">Taşıtlar</a></li><li class="breadcrumb-item active">@ViewData["Title"]</li></ol> }
+
+<form method="post" action="/tasit/Home/Duzenle" enctype="multipart/form-data">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="Id" value="@Model.Id"/>
+    <input type="hidden" name="KurumId" value="@Model.KurumId"/>
+    <input type="hidden" name="GuncelKm" value="@Model.GuncelKm"/>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0 fw-bold"><i class="bi bi-truck-front me-2 text-primary"></i>@ViewData["Title"]</h5>
+        <div><a href="/tasit" class="btn btn-outline-secondary btn-sm">İptal</a><button class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Kaydet</button></div>
+    </div>
+
+    <div class="card mb-3"><div class="card-header bg-white fw-semibold">Araç Bilgileri</div><div class="card-body"><div class="row g-3">
+        <div class="col-md-3"><label class="form-label small fw-semibold">Plaka <span class="text-danger">*</span></label><input name="Plaka" value="@Model.Plaka" class="form-control form-control-sm" required/></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold">Marka</label><input name="Marka" value="@Model.Marka" class="form-control form-control-sm"/></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold">Model</label><input name="Model" value="@Model.Model" class="form-control form-control-sm"/></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold">Model Yılı</label><input name="ModelYili" type="number" value="@Model.ModelYili" class="form-control form-control-sm"/></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold">Şasi No</label><input name="SasiNo" value="@Model.SasiNo" class="form-control form-control-sm"/></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold">Motor No</label><input name="MotorNo" value="@Model.MotorNo" class="form-control form-control-sm"/></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold">Renk</label><input name="Renk" value="@Model.Renk" class="form-control form-control-sm"/></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold">Yakıt</label>
+            <select name="Yakit" class="form-select form-select-sm">
+                @foreach (var y in Enum.GetValues<YakitTuru>()) { if (Model.Yakit == y) { <option value="@y" selected>@y</option> } else { <option value="@y">@y</option> } }
+            </select></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold">Sınıf</label>
+            <select name="Sinif" class="form-select form-select-sm">
+                @foreach (var s in new[]{"Binek","Minibüs","Kamyonet","Kamyon","Otobüs","Arazi"}) { if (Model.Sinif == s) { <option selected>@s</option> } else { <option>@s</option> } }
+            </select></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold">Durum</label>
+            <select name="Durum" class="form-select form-select-sm">
+                @foreach (var d in Enum.GetValues<TasitDurumu>()) { if (Model.Durum == d) { <option value="@d" selected>@d</option> } else { <option value="@d">@d</option> } }
+            </select></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold">Edinim Bedeli (₺)</label><input name="EdinimBedeli" type="number" step="0.01" value="@Model.EdinimBedeli" class="form-control form-control-sm"/></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold">Edinim Tarihi</label><input name="EdinimTarihi" type="date" value="@Dt(Model.EdinimTarihi)" class="form-control form-control-sm"/></div>
+    </div></div></div>
+
+    <div class="card mb-3"><div class="card-header bg-white fw-semibold">Tahsis & Belge Tarihleri</div><div class="card-body"><div class="row g-3">
+        <div class="col-md-4"><label class="form-label small fw-semibold">Tahsis Edilen Personel</label>
+            <select name="TahsisEdilenKullaniciId" class="form-select form-select-sm">
+                <option value="">– Yok –</option>
+                @foreach (var k in kullanicilar) { if (Model.TahsisEdilenKullaniciId == k.Id) { <option value="@k.Id" selected>@k.AdSoyad</option> } else { <option value="@k.Id">@k.AdSoyad</option> } }
+            </select></div>
+        <div class="col-md-4"><label class="form-label small fw-semibold">Tahsis Birim</label><input name="TahsisBirim" value="@Model.TahsisBirim" class="form-control form-control-sm"/></div>
+        <div class="col-md-4"><label class="form-label small fw-semibold">Tahsis Tarihi</label><input name="TahsisTarihi" type="date" value="@Dt(Model.TahsisTarihi)" class="form-control form-control-sm"/></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold">Muayene Bitiş</label><input name="MuayeneBitisTarihi" type="date" value="@Dt(Model.MuayeneBitisTarihi)" class="form-control form-control-sm"/></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold">Sigorta Bitiş</label><input name="SigortaBitisTarihi" type="date" value="@Dt(Model.SigortaBitisTarihi)" class="form-control form-control-sm"/></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold">Kasko Bitiş</label><input name="KaskoBitisTarihi" type="date" value="@Dt(Model.KaskoBitisTarihi)" class="form-control form-control-sm"/></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold">Araç Fotoğrafı</label><input type="file" name="resim" accept="image/*" class="form-control form-control-sm"/></div>
+    </div></div></div>
+</form>

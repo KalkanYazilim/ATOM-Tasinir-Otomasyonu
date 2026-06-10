@@ -1,0 +1,63 @@
+@model List<ATOM.Models.Domain.Tasit>
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@using System.Security.Claims
+@{
+    ViewData["Title"] = "Taşıt Yönetimi";
+    var kurumlar = ViewBag.Kurumlar as Dictionary<string, string> ?? new();
+    var rol = User.FindFirstValue(ClaimTypes.Role) ?? "";
+    bool yetkili = new[]{AtomRoller.IlDepoSorumlusu,AtomRoller.MerkezDepoSorumlusu,AtomRoller.IlMuduru,AtomRoller.BakanlikMerkez,AtomRoller.SistemAdmin}.Contains(rol);
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+}
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item active">Taşıt Yönetimi</li></ol> }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-truck-front me-2 text-primary"></i>Taşıt Yönetimi <span class="text-muted fw-normal small">(237 sayılı Taşıt Kanunu)</span></h5>
+    @if (yetkili) { <a href="/tasit/Home/Duzenle" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Yeni Taşıt</a> }
+</div>
+
+<div class="row g-2 mb-3">
+    <div class="col-md-3"><div class="card stat-card info"><div class="card-body py-2"><div class="text-muted small">Toplam Taşıt</div><div class="fs-4 fw-bold">@Model.Count</div></div></div></div>
+    <div class="col-md-3"><div class="card stat-card success"><div class="card-body py-2"><div class="text-muted small">Aktif</div><div class="fs-4 fw-bold">@Model.Count(t => t.Durum == TasitDurumu.Aktif)</div></div></div></div>
+    <div class="col-md-3"><div class="card stat-card warning"><div class="card-body py-2"><div class="text-muted small">Muayene Yaklaşan (30g)</div><div class="fs-4 fw-bold text-warning">@ViewBag.YaklasanMuayene</div></div></div></div>
+    <div class="col-md-3"><div class="card stat-card danger"><div class="card-body py-2"><div class="text-muted small">Sigorta Yaklaşan (30g)</div><div class="fs-4 fw-bold text-danger">@ViewBag.YaklasanSigorta</div></div></div></div>
+</div>
+
+<div class="card mb-3"><div class="card-body py-2">
+    <form method="get" class="row g-2">
+        <div class="col-md-5"><input name="ara" value="@ViewBag.Ara" class="form-control form-control-sm" placeholder="Plaka veya marka ara..."/></div>
+        <div class="col-md-3"><select name="durum" class="form-select form-select-sm">
+            <option value="">– Tüm Durumlar –</option>
+            @foreach (var d in Enum.GetValues<TasitDurumu>())
+            { if (ViewBag.Durum?.ToString() == d.ToString()) { <option value="@d" selected>@d</option> } else { <option value="@d">@d</option> } }
+        </select></div>
+        <div class="col-md-2"><button class="btn btn-outline-primary btn-sm w-100">Filtrele</button></div>
+        <div class="col-md-2"><a href="/tasit" class="btn btn-outline-secondary btn-sm w-100">Temizle</a></div>
+    </form>
+</div></div>
+
+<div class="card"><div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+        <thead class="table-light"><tr><th style="width:54px"></th><th>Plaka</th><th>Marka/Model</th><th>Yıl</th><th>Yakıt</th><th class="text-end">KM</th><th>Muayene</th><th>Sigorta</th><th>Durum</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var t in Model)
+        {
+            bool muayeneYakin = t.MuayeneBitisTarihi.HasValue && t.MuayeneBitisTarihi.Value <= DateTime.UtcNow.AddDays(30);
+            bool sigortaYakin = t.SigortaBitisTarihi.HasValue && t.SigortaBitisTarihi.Value <= DateTime.UtcNow.AddDays(30);
+            <tr>
+                <td>@if (!string.IsNullOrEmpty(t.ResimUrl)) { <img src="@t.ResimUrl" class="rounded" style="width:44px;height:32px;object-fit:cover;"/> } else { <i class="bi bi-car-front text-muted"></i> }</td>
+                <td class="fw-semibold">@t.Plaka</td>
+                <td class="small">@t.Marka @t.Model</td>
+                <td class="small">@t.ModelYili</td>
+                <td class="small">@t.Yakit</td>
+                <td class="text-end small">@t.GuncelKm.ToString("N0")</td>
+                <td class="small @(muayeneYakin?"text-danger fw-semibold":"")">@(t.MuayeneBitisTarihi?.ToString("dd.MM.yyyy") ?? "–")</td>
+                <td class="small @(sigortaYakin?"text-danger fw-semibold":"")">@(t.SigortaBitisTarihi?.ToString("dd.MM.yyyy") ?? "–")</td>
+                <td><span class="badge bg-@(t.Durum==TasitDurumu.Aktif?"success":t.Durum==TasitDurumu.Bakimda?"warning text-dark":t.Durum==TasitDurumu.Hasarli?"danger":"secondary")">@t.Durum</span></td>
+                <td><a href="/tasit/Home/Detay/@t.Id" class="btn btn-sm btn-outline-secondary py-0">Detay</a></td>
+            </tr>
+        }
+        @if (!Model.Any()) { <tr><td colspan="10" class="text-center text-muted py-4">Taşıt kaydı yok.</td></tr> }
+        </tbody>
+    </table>
+</div></div></div>

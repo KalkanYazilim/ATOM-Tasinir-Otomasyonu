@@ -1,7 +1,11 @@
 using ClosedXML.Excel;
+using DocumentFormat.OpenXml;
+using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml.Wordprocessing;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using W = DocumentFormat.OpenXml.Wordprocessing;
 
 namespace ATOM.Services;
 
@@ -61,7 +65,7 @@ public class BelgeService
     public byte[] PdfTablo(string baslik, string altBilgi, IList<string> basliklar,
         IEnumerable<IList<string>> satirlar, string? mevzuat = null, bool yatay = false)
     {
-        var doc = Document.Create(container =>
+        var doc = QuestPDF.Fluent.Document.Create(container =>
         {
             container.Page(page =>
             {
@@ -117,5 +121,84 @@ public class BelgeService
         });
 
         return doc.GeneratePdf();
+    }
+
+    // ─── WORD (.docx) ─────────────────────────────────────────
+    public byte[] WordTablo(string baslik, string altBilgi, IList<string> basliklar,
+        IEnumerable<IList<string>> satirlar, string? mevzuat = null, string? dogrulamaKodu = null)
+    {
+        using var ms = new MemoryStream();
+        using (var wordDoc = WordprocessingDocument.Create(ms, WordprocessingDocumentType.Document))
+        {
+            var mainPart = wordDoc.AddMainDocumentPart();
+            mainPart.Document = new W.Document();
+            var body = mainPart.Document.AppendChild(new W.Body());
+
+            body.AppendChild(OrtaParagraf("T.C. BAKANLIK – TAŞINIR YÖNETİM SİSTEMİ (ATOM)", 22, true));
+            body.AppendChild(OrtaParagraf(baslik, 28, true, "1F3864"));
+            if (!string.IsNullOrEmpty(altBilgi)) body.AppendChild(OrtaParagraf(altBilgi, 18, false, "808080"));
+
+            var tablo = new W.Table();
+            tablo.AppendChild(new W.TableProperties(
+                new W.TableBorders(
+                    new W.TopBorder { Val = W.BorderValues.Single, Size = 4 },
+                    new W.BottomBorder { Val = W.BorderValues.Single, Size = 4 },
+                    new W.LeftBorder { Val = W.BorderValues.Single, Size = 4 },
+                    new W.RightBorder { Val = W.BorderValues.Single, Size = 4 },
+                    new W.InsideHorizontalBorder { Val = W.BorderValues.Single, Size = 4 },
+                    new W.InsideVerticalBorder { Val = W.BorderValues.Single, Size = 4 }),
+                new W.TableWidth { Width = "5000", Type = W.TableWidthUnitValues.Pct }));
+
+            var baslikSatir = new W.TableRow();
+            foreach (var b in basliklar) baslikSatir.AppendChild(Hucre(b, true, "1F3864"));
+            tablo.AppendChild(baslikSatir);
+
+            foreach (var satir in satirlar)
+            {
+                var tr = new W.TableRow();
+                foreach (var h in satir) tr.AppendChild(Hucre(h ?? "", false, null));
+                tablo.AppendChild(tr);
+            }
+            body.AppendChild(tablo);
+
+            body.AppendChild(new W.Paragraph());
+            if (!string.IsNullOrEmpty(mevzuat)) body.AppendChild(KucukParagraf(mevzuat));
+            if (!string.IsNullOrEmpty(dogrulamaKodu))
+                body.AppendChild(KucukParagraf($"Belge Doğrulama Kodu: {dogrulamaKodu} — Bu belge elektronik onaylıdır (5070 sayılı Kanun)."));
+            body.AppendChild(KucukParagraf($"Üretim Tarihi: {DateTime.Now:dd.MM.yyyy HH:mm}"));
+
+            mainPart.Document.Save();
+        }
+        return ms.ToArray();
+    }
+
+    private static W.Paragraph OrtaParagraf(string metin, int boyut, bool kalin, string? renk = null)
+    {
+        var run = new W.Run();
+        var props = new W.RunProperties(new W.FontSize { Val = boyut.ToString() });
+        if (kalin) props.AppendChild(new W.Bold());
+        if (renk != null) props.AppendChild(new W.Color { Val = renk });
+        run.AppendChild(props);
+        run.AppendChild(new W.Text(metin));
+        var p = new W.Paragraph(run);
+        p.ParagraphProperties = new W.ParagraphProperties(new W.Justification { Val = W.JustificationValues.Center });
+        return p;
+    }
+
+    private static W.Paragraph KucukParagraf(string metin)
+    {
+        var run = new W.Run(new W.RunProperties(new W.FontSize { Val = "16" }, new W.Italic()), new W.Text(metin));
+        return new W.Paragraph(run);
+    }
+
+    private static W.TableCell Hucre(string metin, bool kalin, string? arkaplan)
+    {
+        var props = new W.RunProperties(new W.FontSize { Val = "18" });
+        if (kalin) { props.AppendChild(new W.Bold()); props.AppendChild(new W.Color { Val = "FFFFFF" }); }
+        var run = new W.Run(props, new W.Text(metin) { Space = SpaceProcessingModeValues.Preserve });
+        var hucre = new W.TableCell(new W.Paragraph(run));
+        if (arkaplan != null)
+            hucre.TableCellProperties = new W.TableCellProperties(new W.Shading { Fill = arkaplan, Val = W.ShadingPatternValues.Clear });
+        return hucre;
     }
 }

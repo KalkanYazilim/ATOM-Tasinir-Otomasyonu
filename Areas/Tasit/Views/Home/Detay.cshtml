@@ -1,0 +1,117 @@
+@model ATOM.Models.Domain.Tasit
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@using System.Security.Claims
+@{
+    ViewData["Title"] = $"Taşıt – {Model.Plaka}";
+    var kullanicilar = ViewBag.Kullanicilar as Dictionary<string, string> ?? new();
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+    var rol = User.FindFirstValue(ClaimTypes.Role) ?? "";
+    bool yetkili = new[]{AtomRoller.IlDepoSorumlusu,AtomRoller.MerkezDepoSorumlusu,AtomRoller.IlMuduru,AtomRoller.BakanlikMerkez,AtomRoller.SistemAdmin}.Contains(rol);
+}
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/tasit">Taşıtlar</a></li><li class="breadcrumb-item active">@Model.Plaka</li></ol> }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-truck-front me-2 text-primary"></i>@Model.Plaka
+        <span class="text-muted fw-normal fs-6">· @Model.Marka @Model.Model (@Model.ModelYili)</span>
+        <span class="badge bg-@(Model.Durum==TasitDurumu.Aktif?"success":"secondary") ms-2">@Model.Durum</span></h5>
+    @if (yetkili) { <a href="/tasit/Home/Duzenle/@Model.Id" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil me-1"></i>Düzenle</a> }
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="card mb-3"><div class="card-body text-center">
+            @if (!string.IsNullOrEmpty(Model.ResimUrl)) { <img src="@Model.ResimUrl" class="img-fluid rounded mb-2" style="max-height:160px;"/> }
+            else { <i class="bi bi-car-front display-1 text-muted"></i> }
+            <div class="row g-2 mt-1 text-start small">
+                <div class="col-6"><span class="text-muted">Şasi:</span> @Model.SasiNo</div>
+                <div class="col-6"><span class="text-muted">Motor:</span> @Model.MotorNo</div>
+                <div class="col-6"><span class="text-muted">Yakıt:</span> @Model.Yakit</div>
+                <div class="col-6"><span class="text-muted">Renk:</span> @Model.Renk</div>
+                <div class="col-6"><span class="text-muted">Sınıf:</span> @Model.Sinif</div>
+                <div class="col-6"><span class="text-muted">Güncel KM:</span> @Model.GuncelKm.ToString("N0")</div>
+            </div>
+        </div></div>
+        <div class="card"><div class="card-header bg-white fw-semibold">Tahsis & Belgeler</div><div class="card-body small">
+            <div class="mb-1"><span class="text-muted">Tahsis:</span> @(Model.TahsisEdilenKullaniciId != null && kullanicilar.TryGetValue(Model.TahsisEdilenKullaniciId, out var ta) ? ta : "–") @(string.IsNullOrEmpty(Model.TahsisBirim)?"":$"({Model.TahsisBirim})")</div>
+            <div class="mb-1"><span class="text-muted">Muayene Bitiş:</span> @(Model.MuayeneBitisTarihi?.ToString("dd.MM.yyyy") ?? "–")</div>
+            <div class="mb-1"><span class="text-muted">Sigorta Bitiş:</span> @(Model.SigortaBitisTarihi?.ToString("dd.MM.yyyy") ?? "–")</div>
+            <div><span class="text-muted">Kasko Bitiş:</span> @(Model.KaskoBitisTarihi?.ToString("dd.MM.yyyy") ?? "–")</div>
+        </div></div>
+    </div>
+
+    <div class="col-lg-8">
+        <!-- Yakıt -->
+        <div class="card mb-3"><div class="card-header bg-white fw-semibold d-flex justify-content-between">
+            <span><i class="bi bi-fuel-pump me-2"></i>Yakıt Kayıtları</span>
+            <button class="btn btn-outline-primary btn-sm py-0" data-bs-toggle="modal" data-bs-target="#yakitModal">Ekle</button></div>
+            <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm mb-0">
+                <thead class="table-light"><tr><th>Tarih</th><th>Litre</th><th>Tutar</th><th>KM</th><th>İstasyon</th></tr></thead>
+                <tbody>
+                @foreach (var y in Model.YakitKayitlari.OrderByDescending(x => x.Tarih))
+                { <tr><td class="small">@y.Tarih.ToString("dd.MM.yyyy")</td><td>@y.Litre.ToString("N1") L</td><td>@y.Tutar.ToString("C0", tr)</td><td>@y.Km.ToString("N0")</td><td class="small">@y.Istasyon</td></tr> }
+                @if (!Model.YakitKayitlari.Any()) { <tr><td colspan="5" class="text-center text-muted py-2 small">Kayıt yok.</td></tr> }
+                </tbody></table></div></div>
+        </div>
+        <!-- Bakım -->
+        <div class="card mb-3"><div class="card-header bg-white fw-semibold d-flex justify-content-between">
+            <span><i class="bi bi-wrench me-2"></i>Bakım / Onarım</span>
+            <button class="btn btn-outline-primary btn-sm py-0" data-bs-toggle="modal" data-bs-target="#bakimModal">Ekle</button></div>
+            <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm mb-0">
+                <thead class="table-light"><tr><th>Tarih</th><th>İşlem</th><th>Açıklama</th><th>Tutar</th><th>KM</th><th>Servis</th></tr></thead>
+                <tbody>
+                @foreach (var b in Model.BakimKayitlari.OrderByDescending(x => x.Tarih))
+                { <tr><td class="small">@b.Tarih.ToString("dd.MM.yyyy")</td><td><span class="badge bg-light text-dark">@b.IslemTuru</span></td><td class="small">@b.Aciklama</td><td>@b.Tutar.ToString("C0", tr)</td><td>@b.Km.ToString("N0")</td><td class="small">@b.Servis</td></tr> }
+                @if (!Model.BakimKayitlari.Any()) { <tr><td colspan="6" class="text-center text-muted py-2 small">Kayıt yok.</td></tr> }
+                </tbody></table></div></div>
+        </div>
+        <!-- Kaza -->
+        <div class="card"><div class="card-header bg-white fw-semibold d-flex justify-content-between">
+            <span><i class="bi bi-exclamation-octagon me-2"></i>Kaza Kayıtları</span>
+            <button class="btn btn-outline-danger btn-sm py-0" data-bs-toggle="modal" data-bs-target="#kazaModal">Ekle</button></div>
+            <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm mb-0">
+                <thead class="table-light"><tr><th>Tarih</th><th>Yer</th><th>Açıklama</th><th>Kusur</th><th>Hasar</th><th>Sürücü</th></tr></thead>
+                <tbody>
+                @foreach (var k in Model.KazaKayitlari.OrderByDescending(x => x.Tarih))
+                { <tr><td class="small">@k.Tarih.ToString("dd.MM.yyyy")</td><td class="small">@k.Yer</td><td class="small">@k.Aciklama</td><td>@(k.KusurVar?"<span class='badge bg-danger'>Var</span>":"<span class='badge bg-success'>Yok</span>")</td><td>@k.HasarBedeli.ToString("C0", tr)</td><td class="small">@k.SurucuAdi</td></tr> }
+                @if (!Model.KazaKayitlari.Any()) { <tr><td colspan="6" class="text-center text-muted py-2 small">Kayıt yok.</td></tr> }
+                </tbody></table></div></div>
+        </div>
+    </div>
+</div>
+
+<!-- Modallar -->
+<div class="modal fade" id="yakitModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form method="post" action="/tasit/Home/YakitEkle">
+    @Html.AntiForgeryToken()<input type="hidden" name="id" value="@Model.Id"/>
+    <div class="modal-header"><h6 class="modal-title">Yakıt Kaydı</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body row g-2">
+        <div class="col-6"><label class="form-label small">Litre</label><input name="litre" type="number" step="0.01" class="form-control form-control-sm" required/></div>
+        <div class="col-6"><label class="form-label small">Tutar (₺)</label><input name="tutar" type="number" step="0.01" class="form-control form-control-sm" required/></div>
+        <div class="col-6"><label class="form-label small">KM</label><input name="km" type="number" class="form-control form-control-sm"/></div>
+        <div class="col-6"><label class="form-label small">İstasyon</label><input name="istasyon" class="form-control form-control-sm"/></div>
+    </div><div class="modal-footer"><button class="btn btn-primary btn-sm">Ekle</button></div>
+</form></div></div></div>
+
+<div class="modal fade" id="bakimModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form method="post" action="/tasit/Home/BakimEkle">
+    @Html.AntiForgeryToken()<input type="hidden" name="id" value="@Model.Id"/>
+    <div class="modal-header"><h6 class="modal-title">Bakım Kaydı</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body row g-2">
+        <div class="col-6"><label class="form-label small">İşlem Türü</label><select name="islemTuru" class="form-select form-select-sm"><option>Periyodik</option><option>Onarım</option><option>Lastik</option><option>Muayene</option></select></div>
+        <div class="col-6"><label class="form-label small">Tutar (₺)</label><input name="tutar" type="number" step="0.01" class="form-control form-control-sm"/></div>
+        <div class="col-6"><label class="form-label small">KM</label><input name="km" type="number" class="form-control form-control-sm"/></div>
+        <div class="col-6"><label class="form-label small">Servis</label><input name="servis" class="form-control form-control-sm"/></div>
+        <div class="col-12"><label class="form-label small">Açıklama</label><input name="aciklama" class="form-control form-control-sm"/></div>
+    </div><div class="modal-footer"><button class="btn btn-primary btn-sm">Ekle</button></div>
+</form></div></div></div>
+
+<div class="modal fade" id="kazaModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form method="post" action="/tasit/Home/KazaEkle">
+    @Html.AntiForgeryToken()<input type="hidden" name="id" value="@Model.Id"/>
+    <div class="modal-header"><h6 class="modal-title">Kaza Kaydı</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body row g-2">
+        <div class="col-6"><label class="form-label small">Yer</label><input name="yer" class="form-control form-control-sm"/></div>
+        <div class="col-6"><label class="form-label small">Sürücü</label><input name="surucuAdi" class="form-control form-control-sm"/></div>
+        <div class="col-6"><label class="form-label small">Hasar Bedeli (₺)</label><input name="hasarBedeli" type="number" step="0.01" class="form-control form-control-sm"/></div>
+        <div class="col-6 d-flex align-items-end"><div class="form-check"><input type="checkbox" name="kusurVar" value="true" class="form-check-input" id="kusur"/><label class="form-check-label small" for="kusur">Kusur var</label></div></div>
+        <div class="col-12"><label class="form-label small">Açıklama</label><input name="aciklama" class="form-control form-control-sm"/></div>
+    </div><div class="modal-footer"><button class="btn btn-danger btn-sm">Ekle</button></div>
+</form></div></div></div>

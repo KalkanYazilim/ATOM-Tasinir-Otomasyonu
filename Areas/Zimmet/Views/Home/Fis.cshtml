@@ -7,6 +7,7 @@
     var veren = ViewBag.Veren as AtomKullanici;
     var depo = ViewBag.Depo as Depo;
     var kurum = ViewBag.Kurum as Kurum;
+    var imza = ViewBag.Imza as ElektronikImza;
 }
 <!DOCTYPE html>
 <html lang="tr">
@@ -29,6 +30,7 @@
 </head>
 <body>
     <div class="no-print" style="text-align:right;margin-bottom:10px;">
+        <a href="/zimmet/Home/FisWord/@Model.Id" style="padding:6px 16px;text-decoration:none;border:1px solid #1a3a6b;color:#1a3a6b;border-radius:4px;margin-right:6px;">📄 Word</a>
         <button onclick="window.print()" style="padding:6px 16px;">🖨 Yazdır</button>
     </div>
 
@@ -74,5 +76,22 @@
         <div><div class="line">Teslim Eden<br/>@(veren?.AdSoyad)</div></div>
         <div><div class="line">Teslim Alan<br/>@(personel?.AdSoyad)</div></div>
     </div>
+
+    @if (imza != null)
+    {
+        <div style="margin-top:30px;border-top:1px dashed #999;padding-top:10px;display:flex;align-items:center;gap:14px;">
+            <div id="dogrulamaQr"></div>
+            <div style="font-size:9pt;color:#333;">
+                <strong>Bu belge elektronik olarak onaylanmıştır.</strong> (5070 sayılı Elektronik İmza Kanunu)<br/>
+                Onaylayan: @imza.ImzalayanAdSoyad · @imza.ImzaTarihi.ToString("dd.MM.yyyy HH:mm")<br/>
+                Doğrulama Kodu: <strong>@imza.DogrulamaKodu</strong><br/>
+                Doğrulama: <em>.../belge-dogrula</em> adresinden kod ile sorgulanabilir.
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+        <script>
+            new QRCode(document.getElementById('dogrulamaQr'), { text: window.location.origin + "/belge-dogrula?kod=@imza.DogrulamaKodu", width:80, height:80 });
+        </script>
+    }
 </body>
 </html>

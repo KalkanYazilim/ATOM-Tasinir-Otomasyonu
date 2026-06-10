@@ -89,6 +89,16 @@ public interface IAtomDataService
     Task<DevirKaydi?> DevirGetirAsync(string id);
     Task DevirKaydetAsync(DevirKaydi devir);
 
+    // ── Taşıt ─────────────────────────────────────────────────
+    Task<List<Tasit>> TasitlariGetirAsync();
+    Task<Tasit?> TasitGetirAsync(string id);
+    Task TasitKaydetAsync(Tasit tasit);
+
+    // ── Elektronik İmza ───────────────────────────────────────
+    Task<List<ElektronikImza>> ImzalariGetirAsync();
+    Task<ElektronikImza?> ImzaDogrulamaKoduylaGetirAsync(string kod);
+    Task ImzaKaydetAsync(ElektronikImza imza);
+
     // ── Audit Log ─────────────────────────────────────────────
     Task<List<AuditLog>> AuditLoglariGetirAsync();
     Task AuditKaydetAsync(AuditLog log);

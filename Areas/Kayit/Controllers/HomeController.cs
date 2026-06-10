@@ -219,6 +219,24 @@ public class HomeController : Controller
         return File(bytes, "application/pdf", $"envanter-{DateTime.Now:yyyyMMdd}.pdf");
     }
 
+    // ─── Word Export ──────────────────────────────────────────
+    public async Task<IActionResult> WordExport()
+    {
+        var kayitlar = await _svc.TasinirKayitlariGetirAsync();
+        if (!AtomRoller.BakanlikRolleri.Contains(Rol))
+            kayitlar = kayitlar.Where(k => k.KurumId == KurumId).ToList();
+
+        var basliklar = new List<string> { "Barkod", "Sicil No", "Cinsi", "Marka/Model", "Birim Fiyat", "Ambar", "Durum" };
+        var satirlar = kayitlar.Take(400).Select(k => (IList<string>)new List<string>
+        {
+            k.BarKod, k.SicilNo, k.Cinsi, $"{k.MarkaAdi} {k.Modeli}", k.BirimFiyat.ToString("N2"), k.AmbarAdi, k.Durum.ToString()
+        });
+        var bytes = _belge.WordTablo("DAYANIKLI TAŞINIR LİSTESİ",
+            $"Kayıt Sayısı: {kayitlar.Count} · Tarih: {DateTime.Now:dd.MM.yyyy}", basliklar, satirlar,
+            "Dayanak: Taşınır Mal Yönetmeliği – Dayanıklı Taşınır Listesi (5018 sayılı Kanun)");
+        return File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", $"envanter-{DateTime.Now:yyyyMMdd}.docx");
+    }
+
     // ─── CSV İçe Aktarma (TKYS uyumlu) ────────────────────────
     [HttpGet]
     [Authorize(Roles = $"{AtomRoller.MerkezDepoSorumlusu},{AtomRoller.IlDepoSorumlusu},{AtomRoller.SistemAdmin},{AtomRoller.BakanlikMerkez}")]

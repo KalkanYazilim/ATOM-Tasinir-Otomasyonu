@@ -122,6 +122,96 @@ public class DevirKalemi
 }
 
 // ═════════════════════════════════════════════════════════════
+// TAŞIT (237 sayılı Taşıt Kanunu)
+// ═════════════════════════════════════════════════════════════
+
+public enum TasitDurumu { Aktif, Bakimda, Hasarli, Hizmetdisi, Satildi, Hurda }
+public enum YakitTuru { Benzin, Dizel, LPG, Elektrik, Hibrit }
+
+public class Tasit
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string Plaka { get; set; } = "";
+    public string? TasinirKayitId { get; set; }       // taşınır kaydıyla bağ
+    public string KurumId { get; set; } = "";
+    public string Marka { get; set; } = "";
+    public string Model { get; set; } = "";
+    public int ModelYili { get; set; }
+    public string SasiNo { get; set; } = "";
+    public string MotorNo { get; set; } = "";
+    public string Renk { get; set; } = "";
+    public YakitTuru Yakit { get; set; }
+    public string Sinif { get; set; } = "Binek";       // Binek, Minibüs, Kamyonet, Kamyon, Otobüs
+    public TasitDurumu Durum { get; set; } = TasitDurumu.Aktif;
+    public decimal EdinimBedeli { get; set; }
+    public DateTime? EdinimTarihi { get; set; }
+    // Tahsis
+    public string? TahsisEdilenKullaniciId { get; set; }
+    public string? TahsisBirim { get; set; }
+    public DateTime? TahsisTarihi { get; set; }
+    // Belge tarihleri
+    public DateTime? MuayeneBitisTarihi { get; set; }
+    public DateTime? SigortaBitisTarihi { get; set; }
+    public DateTime? KaskoBitisTarihi { get; set; }
+    public int GuncelKm { get; set; }
+    public string? ResimUrl { get; set; }
+    public DateTime OlusturmaTarihi { get; set; } = DateTime.UtcNow;
+    public List<TasitYakitKaydi> YakitKayitlari { get; set; } = new();
+    public List<TasitBakimKaydi> BakimKayitlari { get; set; } = new();
+    public List<TasitKazaKaydi> KazaKayitlari { get; set; } = new();
+}
+
+public class TasitYakitKaydi
+{
+    public DateTime Tarih { get; set; } = DateTime.UtcNow;
+    public decimal Litre { get; set; }
+    public decimal Tutar { get; set; }
+    public int Km { get; set; }
+    public string Istasyon { get; set; } = "";
+    public string KullaniciAdi { get; set; } = "";
+}
+
+public class TasitBakimKaydi
+{
+    public DateTime Tarih { get; set; } = DateTime.UtcNow;
+    public string IslemTuru { get; set; } = "";   // Periyodik, Onarım, Lastik, Muayene
+    public string Aciklama { get; set; } = "";
+    public decimal Tutar { get; set; }
+    public int Km { get; set; }
+    public string Servis { get; set; } = "";
+}
+
+public class TasitKazaKaydi
+{
+    public DateTime Tarih { get; set; } = DateTime.UtcNow;
+    public string Yer { get; set; } = "";
+    public string Aciklama { get; set; } = "";
+    public bool KusurVar { get; set; }
+    public decimal HasarBedeli { get; set; }
+    public string SurucuAdi { get; set; } = "";
+}
+
+// ═════════════════════════════════════════════════════════════
+// ELEKTRONİK İMZA / ONAY (5070 sayılı Kanun, EBYS hazır)
+// ═════════════════════════════════════════════════════════════
+
+public class ElektronikImza
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string DogrulamaKodu { get; set; } = "";   // belge doğrulama kodu (kısa)
+    public string BelgeTuru { get; set; } = "";        // ZimmetFisi, TIF, SayimTutanagi ...
+    public string BelgeId { get; set; } = "";
+    public string BelgeNo { get; set; } = "";
+    public string BelgeHash { get; set; } = "";        // SHA256
+    public string ImzalayanKullaniciId { get; set; } = "";
+    public string ImzalayanAdSoyad { get; set; } = "";
+    public string ImzalayanRol { get; set; } = "";
+    public string ImzaTipi { get; set; } = "Elektronik Onay"; // Elektronik Onay / E-İmza
+    public DateTime ImzaTarihi { get; set; } = DateTime.UtcNow;
+    public string Kurum { get; set; } = "";
+}
+
+// ═════════════════════════════════════════════════════════════
 // AUDIT LOG — kullanıcıya gösterilebilen işlem geçmişi
 // ═════════════════════════════════════════════════════════════
 

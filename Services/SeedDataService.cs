@@ -168,6 +168,24 @@ public class SeedDataHostedService : IHostedService
             Islem="Onay", KayitTur="MalKabul", KayitId="mk-1", Aciklama="MK-2026-000001 onaylandı, 50 demirbaş kaydı üretildi", Tarih=now.AddDays(-18), Ip="10.0.0.21" });
         await svc.AuditKaydetAsync(new AuditLog { KullaniciAdi="Mehmet Demir", Rol=AtomRoller.MerkezDepoSorumlusu, Modul="Sevk",
             Islem="Oluşturma", KayitTur="Sevk", KayitId="sv-1", Aciklama="SVK-2026-000001 sevk oluşturuldu", Tarih=now.AddDays(-12), Ip="10.0.0.21" });
+
+        // ── Taşıtlar (237 sayılı Taşıt Kanunu) ──
+        await svc.TasitKaydetAsync(new Tasit { Id="ta-1", Plaka="06 ATOM 06", KurumId="k-ankara", Marka="Ford", Model="Focus",
+            ModelYili=2022, SasiNo="NM0AXXTTFAB12345", MotorNo="M9DA-998877", Renk="Beyaz", Yakit=YakitTuru.Dizel, Sinif="Binek",
+            Durum=TasitDurumu.Aktif, EdinimBedeli=850000, EdinimTarihi=now.AddYears(-2), GuncelKm=48500,
+            TahsisEdilenKullaniciId="u-ankara-il", TahsisBirim="İl Müdürlüğü Makam", TahsisTarihi=now.AddYears(-2),
+            MuayeneBitisTarihi=now.AddDays(20), SigortaBitisTarihi=now.AddDays(45), KaskoBitisTarihi=now.AddDays(120),
+            YakitKayitlari=new(){ new(){ Tarih=now.AddDays(-10), Litre=42, Tutar=1680, Km=48000, Istasyon="Petrol Ofisi", KullaniciAdi="Ali Çelik" } },
+            BakimKayitlari=new(){ new(){ Tarih=now.AddDays(-60), IslemTuru="Periyodik", Aciklama="40.000 km bakımı", Tutar=3200, Km=40000, Servis="Yetkili Servis" } } });
+        await svc.TasitKaydetAsync(new Tasit { Id="ta-2", Plaka="34 ATOM 34", KurumId="k-istanbul", Marka="Fiat", Model="Doblo",
+            ModelYili=2021, SasiNo="ZFA26300012345", MotorNo="199A-445566", Renk="Gri", Yakit=YakitTuru.Dizel, Sinif="Kamyonet",
+            Durum=TasitDurumu.Aktif, EdinimBedeli=650000, EdinimTarihi=now.AddYears(-3), GuncelKm=92000,
+            MuayeneBitisTarihi=now.AddDays(200), SigortaBitisTarihi=now.AddDays(15),
+            KazaKayitlari=new(){ new(){ Tarih=now.AddDays(-90), Yer="İstanbul E-5", Aciklama="Hafif maddi hasarlı", KusurVar=false, HasarBedeli=12000, SurucuAdi="Zeynep Şahin" } } });
+        await svc.TasitKaydetAsync(new Tasit { Id="ta-3", Plaka="06 ATOM 07", KurumId="k-ankara", Marka="Renault", Model="Master",
+            ModelYili=2019, SasiNo="VF1MA000012399", MotorNo="M9T-112233", Renk="Beyaz", Yakit=YakitTuru.Dizel, Sinif="Minibüs",
+            Durum=TasitDurumu.Bakimda, EdinimBedeli=720000, EdinimTarihi=now.AddYears(-5), GuncelKm=185000,
+            MuayeneBitisTarihi=now.AddDays(-5), SigortaBitisTarihi=now.AddDays(90) });
     }
 
     public Task StopAsync(CancellationToken ct) => Task.CompletedTask;

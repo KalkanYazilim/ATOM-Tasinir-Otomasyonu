@@ -174,6 +174,17 @@ public class FileAtomDataService : IAtomDataService
     public async Task<DevirKaydi?> DevirGetirAsync(string id) => (await DevirleriGetirAsync()).FirstOrDefault(x => x.Id == id);
     public Task DevirKaydetAsync(DevirKaydi d) => UpsertAsync("devirler", d, x => x.Id);
 
+    // ── Taşıt ─────────────────────────────────────────────────
+    public Task<List<Tasit>> TasitlariGetirAsync() => OkuAsync<Tasit>("tasitlar");
+    public async Task<Tasit?> TasitGetirAsync(string id) => (await TasitlariGetirAsync()).FirstOrDefault(x => x.Id == id);
+    public Task TasitKaydetAsync(Tasit t) => UpsertAsync("tasitlar", t, x => x.Id);
+
+    // ── Elektronik İmza ───────────────────────────────────────
+    public Task<List<ElektronikImza>> ImzalariGetirAsync() => OkuAsync<ElektronikImza>("imzalar");
+    public async Task<ElektronikImza?> ImzaDogrulamaKoduylaGetirAsync(string kod) =>
+        (await ImzalariGetirAsync()).FirstOrDefault(x => x.DogrulamaKodu.Equals(kod, StringComparison.OrdinalIgnoreCase));
+    public Task ImzaKaydetAsync(ElektronikImza imza) => UpsertAsync("imzalar", imza, x => x.Id);
+
     // ── Audit Log ─────────────────────────────────────────────
     public Task<List<AuditLog>> AuditLoglariGetirAsync() => OkuAsync<AuditLog>("audit-loglar");
     public Task AuditKaydetAsync(AuditLog log) => UpsertAsync("audit-loglar", log, x => x.Id);
