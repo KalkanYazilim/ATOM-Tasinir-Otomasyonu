@@ -1,0 +1,79 @@
+@using ATOM.Models.Domain
+@{
+    ViewData["Title"] = "Taşınır CSV İçe Aktarma";
+    var onizleme = ViewBag.Onizleme as List<TasinirKayit> ?? new();
+    var hatalar = ViewBag.Hatalar as List<string> ?? new();
+    bool yuklendi = ViewBag.DosyaYuklendi == true;
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/kayit">Taşınır Kayıtları</a></li><li class="breadcrumb-item active">İçe Aktarma</li></ol>
+}
+
+<h5 class="mb-3 fw-bold"><i class="bi bi-upload me-2 text-primary"></i>Taşınır CSV İçe Aktarma (TKYS uyumlu)</h5>
+
+<div class="card mb-3"><div class="card-body">
+    <form method="post" action="/kayit/Home/Import" enctype="multipart/form-data">
+        @Html.AntiForgeryToken()
+        <div class="row g-3 align-items-end">
+            <div class="col-md-7">
+                <label class="form-label small fw-semibold">CSV Dosyası</label>
+                <input type="file" name="dosya" accept=".csv,.txt" class="form-control form-control-sm" required/>
+            </div>
+            <div class="col-md-5">
+                <button type="submit" name="onayla" value="false" class="btn btn-outline-primary btn-sm"><i class="bi bi-eye me-1"></i>Önizle</button>
+                <button type="submit" name="onayla" value="true" class="btn btn-success btn-sm"><i class="bi bi-check2 me-1"></i>Doğrudan Aktar</button>
+            </div>
+        </div>
+    </form>
+    <div class="mt-3 p-2 bg-light rounded small text-muted">
+        <strong>Beklenen kolonlar (başlık satırı, ; veya , ayraçlı):</strong>
+        bar_kod, sicil_no, seri_no, cinsi, markaAdi, modeli, birim_fiyat, ambar_adi, har_birimi_adi, har_birimi_kodu, iladi, ilkoduv, fis_no, tc_numarasi, projeNumarasi
+        <br/>Barkod ve sicil no benzersizlik kontrolünden geçer; çakışan/eksik satırlar atlanır.
+    </div>
+</div></div>
+
+@if (yuklendi)
+{
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-white fw-semibold d-flex justify-content-between">
+                    <span><i class="bi bi-table me-2"></i>Önizleme (@onizleme.Count geçerli kayıt)</span>
+                    @if (onizleme.Count > 0)
+                    {
+                        <span class="badge bg-success">Aktarmak için "Doğrudan Aktar" ile dosyayı tekrar yükleyin</span>
+                    }
+                </div>
+                <div class="card-body p-0"><div class="table-responsive" style="max-height:420px;overflow:auto;">
+                    <table class="table table-sm mb-0" style="font-size:.8rem;">
+                        <thead class="table-light" style="position:sticky;top:0;"><tr><th>Barkod</th><th>Sicil</th><th>Cinsi</th><th>Marka</th><th class="text-end">Fiyat</th><th>İl</th></tr></thead>
+                        <tbody>
+                        @foreach (var o in onizleme.Take(200))
+                        {
+                            <tr><td>@o.BarKod</td><td>@o.SicilNo</td><td>@o.Cinsi</td><td>@o.MarkaAdi</td>
+                                <td class="text-end">@o.BirimFiyat.ToString("C0", tr)</td><td>@o.IlAdi</td></tr>
+                        }
+                        </tbody>
+                    </table>
+                </div></div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card border-@(hatalar.Any() ? "warning" : "success")">
+                <div class="card-header bg-white fw-semibold">
+                    <i class="bi bi-exclamation-triangle me-2 text-warning"></i>Atlanan Satırlar (@hatalar.Count)
+                </div>
+                <div class="card-body p-0" style="max-height:420px;overflow:auto;">
+                    @if (hatalar.Any())
+                    {
+                        <ul class="list-group list-group-flush">
+                        @foreach (var h in hatalar.Take(200)) { <li class="list-group-item small text-danger py-1">@h</li> }
+                        </ul>
+                    }
+                    else { <div class="text-center text-success py-3 small"><i class="bi bi-check-circle me-1"></i>Hatalı satır yok.</div> }
+                </div>
+            </div>
+        </div>
+    </div>
+}

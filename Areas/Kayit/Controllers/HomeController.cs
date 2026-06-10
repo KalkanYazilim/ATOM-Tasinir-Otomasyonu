@@ -151,6 +151,93 @@ public class HomeController : Controller
         return RedirectToAction(nameof(Detay), new { id = model.Id });
     }
 
+    // ─── CSV İçe Aktarma (TKYS uyumlu) ────────────────────────
+    [HttpGet]
+    [Authorize(Roles = $"{AtomRoller.MerkezDepoSorumlusu},{AtomRoller.IlDepoSorumlusu},{AtomRoller.SistemAdmin},{AtomRoller.BakanlikMerkez}")]
+    public IActionResult Import() => View();
+
+    [HttpPost]
+    [Authorize(Roles = $"{AtomRoller.MerkezDepoSorumlusu},{AtomRoller.IlDepoSorumlusu},{AtomRoller.SistemAdmin},{AtomRoller.BakanlikMerkez}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Import(IFormFile? dosya, bool onayla = false)
+    {
+        if (dosya == null || dosya.Length == 0)
+        {
+            TempData["Hata"] = "Lütfen bir CSV dosyası seçin.";
+            return View();
+        }
+
+        var satirlar = new List<string>();
+        using (var reader = new StreamReader(dosya.OpenReadStream(), System.Text.Encoding.UTF8))
+        {
+            string? line;
+            while ((line = await reader.ReadLineAsync()) != null) satirlar.Add(line);
+        }
+        if (satirlar.Count < 2)
+        {
+            TempData["Hata"] = "Dosyada veri satırı yok.";
+            return View();
+        }
+
+        // Başlık eşleme (esnek: noktalı virgül veya virgül)
+        var ayrac = satirlar[0].Contains(';') ? ';' : ',';
+        var basliklar = satirlar[0].TrimStart('﻿').Split(ayrac).Select(b => b.Trim().ToLowerInvariant()).ToList();
+        int Idx(params string[] adlar) => basliklar.FindIndex(b => adlar.Any(a => b == a));
+
+        int iBarkod = Idx("bar_kod", "barkod"), iSicil = Idx("sicil_no", "sicilno"), iSeri = Idx("seri_no", "serino"),
+            iCinsi = Idx("cinsi", "aciklama", "ad"), iMarka = Idx("markaadi", "marka"), iModel = Idx("modeli", "model"),
+            iFiyat = Idx("birim_fiyat", "birimfiyat"), iAmbar = Idx("ambar_adi", "ambar"),
+            iHarAd = Idx("har_birimi_adi"), iHarKod = Idx("har_birimi_kodu"),
+            iIlAd = Idx("iladi", "il"), iIlKod = Idx("ilkoduv", "ilkodu"), iFis = Idx("fis_no", "fisno"),
+            iTc = Idx("tc_numarasi", "tcno"), iProje = Idx("projenumarasi", "projeno");
+
+        var onizleme = new List<TasinirKayit>();
+        var hatalar = new List<string>();
+        var mevcutBarkodlar = (await _svc.TasinirKayitlariGetirAsync()).Select(k => k.BarKod).Where(b => !string.IsNullOrEmpty(b)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var mevcutSiciller = (await _svc.TasinirKayitlariGetirAsync()).Select(k => k.SicilNo).Where(s => !string.IsNullOrEmpty(s)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        for (int r = 1; r < satirlar.Count; r++)
+        {
+            if (string.IsNullOrWhiteSpace(satirlar[r])) continue;
+            var c = satirlar[r].Split(ayrac);
+            string Al(int idx) => (idx >= 0 && idx < c.Length) ? c[idx].Trim().Trim('"') : "";
+
+            var barkod = Al(iBarkod);
+            var sicil = Al(iSicil);
+            var cinsi = Al(iCinsi);
+
+            if (string.IsNullOrEmpty(cinsi)) { hatalar.Add($"Satır {r + 1}: Cinsi/Açıklama boş, atlandı."); continue; }
+            if (!string.IsNullOrEmpty(barkod) && (mevcutBarkodlar.Contains(barkod) || onizleme.Any(o => o.BarKod.Equals(barkod, StringComparison.OrdinalIgnoreCase))))
+            { hatalar.Add($"Satır {r + 1}: Barkod '{barkod}' zaten kayıtlı/tekrar, atlandı."); continue; }
+            if (!string.IsNullOrEmpty(sicil) && (mevcutSiciller.Contains(sicil) || onizleme.Any(o => o.SicilNo.Equals(sicil, StringComparison.OrdinalIgnoreCase))))
+            { hatalar.Add($"Satır {r + 1}: Sicil '{sicil}' zaten kayıtlı/tekrar, atlandı."); continue; }
+
+            decimal.TryParse(Al(iFiyat).Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var fiyat);
+            onizleme.Add(new TasinirKayit
+            {
+                BarKod = barkod, SicilNo = sicil, SeriNo = Al(iSeri), Cinsi = cinsi, Aciklama = cinsi,
+                MarkaAdi = Al(iMarka), Modeli = Al(iModel), BirimFiyat = fiyat, AmbarAdi = Al(iAmbar),
+                HarBirimiAdi = Al(iHarAd), HarBirimiKodu = Al(iHarKod), IlAdi = Al(iIlAd), IlKodu = Al(iIlKod),
+                FisNo = Al(iFis), TcNumarasi = Al(iTc), ProjeNumarasi = Al(iProje),
+                KurumId = KurumId, Durum = TasinirKayitDurumu.Ambarda,
+                IlkGirisTarihi = DateTime.UtcNow,
+                HareketGecmisi = new List<TasinirHareket> { new() { IslemTuru = "CSV İçe Aktarma", Aciklama = "Toplu import", KullaniciId = KullaniciId, KullaniciAdi = KullaniciAdSoyad, YeniDurum = "Ambarda" } }
+            });
+        }
+
+        if (onayla && onizleme.Count > 0)
+        {
+            await _svc.TasinirKayitlariTopluKaydetAsync(onizleme);
+            TempData["Basari"] = $"{onizleme.Count} kayıt içe aktarıldı. {hatalar.Count} satır atlandı.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        ViewBag.Onizleme = onizleme;
+        ViewBag.Hatalar = hatalar;
+        ViewBag.DosyaYuklendi = true;
+        return View();
+    }
+
     private async Task DropdownDoldur()
     {
         var depolar = await _svc.DepolariGetirAsync();

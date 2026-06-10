@@ -1,0 +1,39 @@
+@model List<ATOM.Models.Domain.Zimmet>
+@using ATOM.Models.Domain
+@{
+    ViewData["Title"] = "Personel Zimmet Raporu";
+    var kullanicilar = ViewBag.Kullanicilar as Dictionary<string, string> ?? new();
+    var depolar = ViewBag.Depolar as Dictionary<string, string> ?? new();
+    var grup = Model.Where(z => z.Durum == ZimmetDurumu.Aktif).GroupBy(z => z.PersonelId);
+}
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/raporlama">Raporlar</a></li><li class="breadcrumb-item active">Personel Zimmet</li></ol> }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-person-lines-fill me-2 text-primary"></i>Personel Zimmet Raporu</h5>
+    <button onclick="window.print()" class="btn btn-outline-secondary btn-sm"><i class="bi bi-printer me-1"></i>Yazdır</button>
+</div>
+
+@foreach (var g in grup)
+{
+    <div class="card mb-3">
+        <div class="card-header bg-white fw-semibold d-flex justify-content-between">
+            <span><i class="bi bi-person me-2"></i>@(kullanicilar.TryGetValue(g.Key, out var ad) ? ad : g.Key)</span>
+            <span class="badge bg-primary">@g.SelectMany(z => z.Kalemler).Count() kalem</span>
+        </div>
+        <div class="card-body p-0"><div class="table-responsive">
+            <table class="table table-sm mb-0"><thead class="table-light"><tr><th>Zimmet No</th><th>Cinsi</th><th>Sicil No</th><th>Barkod</th><th>Seri No</th><th>Tarih</th></tr></thead>
+                <tbody>
+                @foreach (var z in g)
+                {
+                    foreach (var k in z.Kalemler)
+                    {
+                        <tr><td class="small">@z.ZimmetNo</td><td>@k.Marka @k.Model</td><td class="small">@k.SicilNo</td>
+                            <td class="small">@k.Barkod</td><td class="small text-muted">@k.SeriNo</td><td class="small">@z.ZimmetTarihi.ToString("dd.MM.yyyy")</td></tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div></div>
+    </div>
+}
+@if (!grup.Any()) { <div class="card"><div class="card-body text-center text-muted py-4">Aktif zimmet bulunmuyor.</div></div> }

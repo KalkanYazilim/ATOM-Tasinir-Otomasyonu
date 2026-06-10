@@ -1,0 +1,46 @@
+@model List<ATOM.Models.Domain.StokHareket>
+@using ATOM.Models.Domain
+@{
+    ViewData["Title"] = "Stok Hareket Dökümü";
+    var depolar = ViewBag.Depolar as Dictionary<string, string> ?? new();
+    var tanimlar = ViewBag.Tanimlar as Dictionary<string, string> ?? new();
+    var depoListesi = ViewBag.DepoListesi as List<Depo> ?? new();
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+}
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/raporlama">Raporlar</a></li><li class="breadcrumb-item active">Stok Hareket Dökümü</li></ol> }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-arrow-down-up me-2 text-primary"></i>Stok Hareket Dökümü</h5>
+    <form method="get" class="d-flex gap-2">
+        <select name="depoId" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">– Tüm Depolar –</option>
+            @foreach (var d in depoListesi)
+            { if (ViewBag.DepoId?.ToString() == d.Id) { <option value="@d.Id" selected>@d.Ad</option> } else { <option value="@d.Id">@d.Ad</option> } }
+        </select>
+    </form>
+</div>
+
+<div class="card"><div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-sm table-hover mb-0" style="font-size:.83rem;">
+        <thead class="table-light"><tr><th>Tarih</th><th>Depo</th><th>Taşınır</th><th>İşlem</th><th>Belge</th>
+            <th class="text-end text-success">Giriş</th><th class="text-end text-danger">Çıkış</th><th class="text-end">Kalan</th><th>Kullanıcı</th></tr></thead>
+        <tbody>
+        @foreach (var h in Model)
+        {
+            <tr>
+                <td class="small">@h.Tarih.ToString("dd.MM.yy HH:mm")</td>
+                <td class="small">@(depolar.TryGetValue(h.DepoId, out var d) ? d : "–")</td>
+                <td class="small">@(tanimlar.TryGetValue(h.TasinirTanimId, out var t) ? t : h.TasinirTanimId)</td>
+                <td><span class="badge bg-light text-dark">@StokHareket.IslemAdi(h.IslemTuru)</span></td>
+                <td class="small text-muted">@h.KaynakBelgeNo</td>
+                <td class="text-end text-success">@(h.GirisMiktar > 0 ? "+" + h.GirisMiktar : "")</td>
+                <td class="text-end text-danger">@(h.CikisMiktar > 0 ? "-" + h.CikisMiktar : "")</td>
+                <td class="text-end fw-semibold">@h.KalanMiktar</td>
+                <td class="small">@h.KullaniciAdi</td>
+            </tr>
+        }
+        @if (!Model.Any()) { <tr><td colspan="9" class="text-center text-muted py-4">Hareket kaydı yok.</td></tr> }
+        </tbody>
+    </table>
+</div></div></div>
+@if (Model.Count >= 1000) { <p class="text-muted small mt-2">Son 1000 hareket gösteriliyor.</p> }
