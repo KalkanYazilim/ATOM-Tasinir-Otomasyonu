@@ -31,7 +31,7 @@
                             </td>
                             <td class="fw-semibold text-muted small">@t.Kod</td>
                             <td>@t.Ad</td>
-                            <td><span class="badge bg-info text-dark">@t.Kategori</span></td>
+                            <td><span class="badge bg-info text-dark">@TasinirKategoriHelper.DisplayName(t.Kategori)</span></td>
                             <td>@t.Birim</td>
                             <td>@(t.DemirbasMi ? "<span class='badge bg-secondary'>Demirbaş</span>" : "<span class='badge bg-light text-dark'>Sarf</span>")</td>
                             <td><span class="badge bg-@(t.AktifMi?"success":"danger")">@(t.AktifMi?"Aktif":"Pasif")</span></td>

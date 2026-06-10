@@ -12,6 +12,22 @@ public enum TasinirKategori
     Kirtasiye, BilisimDonanim, BilisimYazilim, MobilYa,
     ElektrikliEv, Arac, TibbiBekipman, GuvenlikSistemi, Diger
 }
+
+public static class TasinirKategoriHelper
+{
+    public static string DisplayName(TasinirKategori kategori) => kategori switch
+    {
+        TasinirKategori.Kirtasiye => "Kırtasiye",
+        TasinirKategori.BilisimDonanim => "Bilişim Donanımı",
+        TasinirKategori.BilisimYazilim => "Bilişim Yazılımı",
+        TasinirKategori.MobilYa => "Mobilya",
+        TasinirKategori.ElektrikliEv => "Elektrikli Ev/Büro Ekipmanı",
+        TasinirKategori.Arac => "Araç",
+        TasinirKategori.TibbiBekipman => "Tıbbi Ekipman",
+        TasinirKategori.GuvenlikSistemi => "Güvenlik Sistemi",
+        _ => "Diğer"
+    };
+}
 public enum TalepDurumu
 {
     Taslak, GonderildiIlOnay, IlOnaylandi, BakanlikAlindi,

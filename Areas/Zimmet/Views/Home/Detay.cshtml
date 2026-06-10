@@ -23,6 +23,10 @@
     </h5>
     <div class="d-flex gap-2">
         <a href="/zimmet/Home/Fis/@Model.Id" target="_blank" class="btn btn-outline-secondary btn-sm"><i class="bi bi-printer me-1"></i>Zimmet Fişi</a>
+        @if (Model.Durum == ZimmetDurumu.Iade)
+        {
+            <a href="/zimmet/Home/IadeFisWord/@Model.Id" class="btn btn-outline-primary btn-sm"><i class="bi bi-file-earmark-word me-1"></i>İade Fişi</a>
+        }
         @if (Model.Durum == ZimmetDurumu.Aktif && iadeYetkisi)
         {
             <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#iadeModal"><i class="bi bi-arrow-return-left me-1"></i>İade Al</button>

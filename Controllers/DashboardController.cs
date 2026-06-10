@@ -131,7 +131,7 @@ public class DashboardController : Controller
             KategoriBazliStok = gorunenDepolar
                 .SelectMany(d => d.Stoklar)
                 .GroupBy(s => tanimlar.FirstOrDefault(t => t.Id == s.TasinirTanimId)?.Kategori ?? TasinirKategori.Diger)
-                .Select(g => new KategoriStok { Kategori = g.Key.ToString(), Adet = g.Sum(x => x.Miktar) })
+                .Select(g => new KategoriStok { Kategori = TasinirKategoriHelper.DisplayName(g.Key), Adet = g.Sum(x => x.Miktar) })
                 .ToList(),
 
             // Aylık talep trendi (son 6 ay)

@@ -254,6 +254,54 @@ public class HomeController : Controller
         return File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", $"zimmet-{zimmet.ZimmetNo}.docx");
     }
 
+    // ─── İade Fişi Word (.docx) ──────────────────────────────
+    public async Task<IActionResult> IadeFisWord(string id)
+    {
+        var zimmet = await _svc.ZimmetGetirAsync(id);
+        if (zimmet == null) return NotFound();
+        if (Rol == AtomRoller.Personel && zimmet.PersonelId != KullaniciId) return Forbid();
+        if (zimmet.Durum != ZimmetDurumu.Iade)
+        {
+            TempData["Hata"] = "İade fişi yalnızca iade edilmiş zimmetler için üretilebilir.";
+            return RedirectToAction(nameof(Detay), new { id });
+        }
+
+        var kullanicilar = await _svc.KullanicilariGetirAsync();
+        var depolar = await _svc.DepolariGetirAsync();
+        var personel = kullanicilar.FirstOrDefault(k => k.Id == zimmet.PersonelId);
+        var iadeAlan = kullanicilar.FirstOrDefault(k => k.Id == zimmet.OnayGecmisi.LastOrDefault(o => o.Asama.StartsWith("İade"))?.KullaniciId)
+                       ?? kullanicilar.FirstOrDefault(k => k.Id == zimmet.VerenKullaniciId);
+        var depo = depolar.FirstOrDefault(d => d.Id == zimmet.DepoId);
+
+        var basliklar = new List<string> { "S.No", "Barkod", "Sicil No", "Seri No", "Marka/Model", "İade Durumu", "Açıklama" };
+        int sira = 0;
+        var satirlar = zimmet.Kalemler.Select(k => (IList<string>)new List<string>
+        {
+            (++sira).ToString(),
+            k.Barkod,
+            k.SicilNo,
+            k.SeriNo,
+            $"{k.Marka} {k.Model}".Trim(),
+            k.ItemDurumu.ToString(),
+            k.HasarAciklama ?? ""
+        });
+
+        var icerik = $"{zimmet.ZimmetNo}|IADE|{zimmet.PersonelId}|{zimmet.IadeTarihi:o}|{string.Join(",", zimmet.Kalemler.Select(k => k.SicilNo))}";
+        var imza = (await _svc.ImzalariGetirAsync()).FirstOrDefault(i => i.BelgeId == zimmet.Id && i.BelgeTuru == "IadeFisi")
+                   ?? await _imza.BelgeImzalaAsync(User, "IadeFisi", zimmet.Id, $"{zimmet.ZimmetNo}-IADE", icerik, depo?.Ad ?? "");
+
+        var altBilgi = $"Zimmet No: {zimmet.ZimmetNo} · İade Eden: {personel?.AdSoyad} · İade Alan: {iadeAlan?.AdSoyad} · İade Tarihi: {zimmet.IadeTarihi:dd.MM.yyyy}";
+        if (!string.IsNullOrWhiteSpace(zimmet.IadeAciklama))
+            altBilgi += $" · Açıklama: {zimmet.IadeAciklama}";
+
+        var bytes = _belge.WordTablo("TAŞINIR İADE FİŞİ",
+            altBilgi,
+            basliklar, satirlar,
+            "Dayanak: Taşınır Mal Yönetmeliği – zimmet iadesi, taşınırların kullanıcıdan ambara/bakıma/kayıp sürecine dönüş kaydı.",
+            imza.DogrulamaKodu);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", $"iade-{zimmet.ZimmetNo}.docx");
+    }
+
     // ─── Bakım / Arıza ────────────────────────────────────────
     public async Task<IActionResult> Bakim()
     {

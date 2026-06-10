@@ -1,0 +1,109 @@
+@model List<ATOM.Areas.Raporlama.Controllers.MuhasebeIcmalSatir>
+@{
+    ViewData["Title"] = "Taşınır Muhasebe İcmali";
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+    var yil = (int)(ViewBag.Yil ?? DateTime.Now.Year);
+    var yillar = (List<int>)(ViewBag.Yillar ?? new List<int> { yil });
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/raporlama">Raporlar</a></li>
+        <li class="breadcrumb-item active">Muhasebe İcmali</li>
+    </ol>
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+        <h5 class="mb-1 fw-bold"><i class="bi bi-calculator me-2 text-primary"></i>Taşınır Muhasebe İcmali</h5>
+        <div class="text-muted small">Stok hareketlerinden hesap kodu bazlı borç/alacak icmali üretir. Muhasebe entegrasyonu için kontrol raporudur.</div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <form method="get" class="d-flex gap-2">
+            <select name="yil" class="form-select form-select-sm" onchange="this.form.submit()">
+                @foreach (var y in yillar)
+                {
+                    <option value="@y" selected="@(y == yil)">@y</option>
+                }
+            </select>
+        </form>
+        <a href="/raporlama/Home/MuhasebeIcmaliExcel?yil=@yil" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+        <a href="/raporlama/Home/MuhasebeIcmaliWord?yil=@yil" class="btn btn-outline-primary btn-sm"><i class="bi bi-file-earmark-word me-1"></i>Word</a>
+        <button onclick="window.print()" class="btn btn-outline-secondary btn-sm"><i class="bi bi-printer me-1"></i>Yazdır</button>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <div class="card stat-card success"><div class="card-body">
+            <div class="text-muted small">Borç Toplamı</div>
+            <div class="fs-5 fw-bold text-success">@Model.Sum(x => x.Borc).ToString("C2", tr)</div>
+        </div></div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stat-card warning"><div class="card-body">
+            <div class="text-muted small">Alacak Toplamı</div>
+            <div class="fs-5 fw-bold text-warning">@Model.Sum(x => x.Alacak).ToString("C2", tr)</div>
+        </div></div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stat-card primary"><div class="card-body">
+            <div class="text-muted small">Net Hareket</div>
+            <div class="fs-5 fw-bold text-primary">@Model.Sum(x => x.Net).ToString("C2", tr)</div>
+        </div></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Hesap Kodu</th>
+                        <th>Hesap Adı</th>
+                        <th>Kategori</th>
+                        <th class="text-end">Giriş Miktar</th>
+                        <th class="text-end">Çıkış Miktar</th>
+                        <th class="text-end">Borç</th>
+                        <th class="text-end">Alacak</th>
+                        <th class="text-end">Net</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var x in Model)
+                {
+                    <tr>
+                        <td class="fw-semibold">@x.HesapKodu</td>
+                        <td>@x.HesapAdi</td>
+                        <td><span class="badge bg-light text-dark">@x.Kategori</span></td>
+                        <td class="text-end">@x.GirisMiktar.ToString("N0")</td>
+                        <td class="text-end">@x.CikisMiktar.ToString("N0")</td>
+                        <td class="text-end text-success">@x.Borc.ToString("C2", tr)</td>
+                        <td class="text-end text-warning">@x.Alacak.ToString("C2", tr)</td>
+                        <td class="text-end fw-semibold">@x.Net.ToString("C2", tr)</td>
+                    </tr>
+                }
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="8" class="text-center text-muted py-4">Bu yıl için muhasebe icmali oluşturacak stok hareketi bulunamadı.</td></tr>
+                }
+                </tbody>
+                <tfoot class="table-light fw-bold">
+                    <tr>
+                        <td colspan="3">GENEL TOPLAM</td>
+                        <td class="text-end">@Model.Sum(x => x.GirisMiktar).ToString("N0")</td>
+                        <td class="text-end">@Model.Sum(x => x.CikisMiktar).ToString("N0")</td>
+                        <td class="text-end">@Model.Sum(x => x.Borc).ToString("C2", tr)</td>
+                        <td class="text-end">@Model.Sum(x => x.Alacak).ToString("C2", tr)</td>
+                        <td class="text-end">@Model.Sum(x => x.Net).ToString("C2", tr)</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<p class="text-muted small mt-2">
+    <i class="bi bi-info-circle me-1"></i>
+    Bu rapor muhasebe fişi yerine geçmez; taşınır stok hareketlerinin muhasebe kayıtlarıyla karşılaştırılması için kontrol icmalidir.
+</p>

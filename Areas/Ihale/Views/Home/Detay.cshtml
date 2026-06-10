@@ -136,6 +136,12 @@
         <div class="card-body d-grid gap-2">
             @if (rol == AtomRoller.BakanlikSatinAlma || rol == AtomRoller.SistemAdmin)
             {
+                @if (Model.Teklifler.Any())
+                {
+                    <a href="/ihale/Home/TeklifKiyas/@Model.Id" class="btn btn-outline-primary">
+                        <i class="bi bi-bar-chart-steps me-2"></i>Teklif Kıyas Tablosu
+                    </a>
+                }
                 @if (Model.Durum == IhaleDurumu.Hazirlaniyor)
                 {
                     <form method="post" action="/ihale/Home/Ilan">

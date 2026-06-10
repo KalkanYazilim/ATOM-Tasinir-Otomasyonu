@@ -1,0 +1,117 @@
+@model List<ATOM.Areas.Raporlama.Controllers.YonetimHesabiSatir>
+@{
+    ViewData["Title"] = "Taşınır Yönetim Hesabı Cetveli";
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+    var yil = (int)(ViewBag.Yil ?? DateTime.Now.Year);
+    var yillar = (List<int>)(ViewBag.Yillar ?? new List<int> { yil });
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/raporlama">Raporlar</a></li>
+        <li class="breadcrumb-item active">Taşınır Yönetim Hesabı</li>
+    </ol>
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+        <h5 class="mb-1 fw-bold"><i class="bi bi-journal-check me-2 text-primary"></i>Taşınır Yönetim Hesabı Cetveli</h5>
+        <div class="text-muted small">5018 sayılı Kanun ve Taşınır Mal Yönetmeliği kapsamında yıl bazlı devreden, giriş, çıkış ve dönem sonu icmali.</div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <form method="get" class="d-flex gap-2">
+            <select name="yil" class="form-select form-select-sm" onchange="this.form.submit()">
+                @foreach (var y in yillar)
+                {
+                    <option value="@y" selected="@(y == yil)">@y</option>
+                }
+            </select>
+        </form>
+        <a href="/raporlama/Home/YonetimHesabiExcel?yil=@yil" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+        <a href="/raporlama/Home/YonetimHesabiWord?yil=@yil" class="btn btn-outline-primary btn-sm"><i class="bi bi-file-earmark-word me-1"></i>Word</a>
+        <button onclick="window.print()" class="btn btn-outline-secondary btn-sm"><i class="bi bi-printer me-1"></i>Yazdır</button>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="card stat-card info"><div class="card-body">
+            <div class="text-muted small">Devreden Değer</div>
+            <div class="fs-5 fw-bold">@Model.Sum(x => x.DevredenDeger).ToString("C2", tr)</div>
+        </div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card success"><div class="card-body">
+            <div class="text-muted small">Yıl İçi Giriş</div>
+            <div class="fs-5 fw-bold text-success">@Model.Sum(x => x.GirisDeger).ToString("C2", tr)</div>
+        </div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card warning"><div class="card-body">
+            <div class="text-muted small">Yıl İçi Çıkış</div>
+            <div class="fs-5 fw-bold text-warning">@Model.Sum(x => x.CikisDeger).ToString("C2", tr)</div>
+        </div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card primary"><div class="card-body">
+            <div class="text-muted small">Dönem Sonu Değer</div>
+            <div class="fs-5 fw-bold text-primary">@Model.Sum(x => x.DonemSonuDeger).ToString("C2", tr)</div>
+        </div></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Hesap Kodu</th>
+                        <th>Taşınır</th>
+                        <th>Kategori</th>
+                        <th>Birim</th>
+                        <th class="text-end">Devreden</th>
+                        <th class="text-end">Giriş</th>
+                        <th class="text-end">Çıkış</th>
+                        <th class="text-end">Dönem Sonu</th>
+                        <th class="text-end">Dönem Sonu Değer</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var x in Model)
+                {
+                    <tr>
+                        <td class="fw-semibold">@x.HesapKodu</td>
+                        <td>@x.TasinirAdi</td>
+                        <td><span class="badge bg-light text-dark">@x.Kategori</span></td>
+                        <td class="text-muted small">@x.Birim</td>
+                        <td class="text-end">@x.DevredenMiktar.ToString("N0")<br/><span class="text-muted small">@x.DevredenDeger.ToString("C0", tr)</span></td>
+                        <td class="text-end text-success">@x.GirisMiktar.ToString("N0")<br/><span class="small">@x.GirisDeger.ToString("C0", tr)</span></td>
+                        <td class="text-end text-warning">@x.CikisMiktar.ToString("N0")<br/><span class="small">@x.CikisDeger.ToString("C0", tr)</span></td>
+                        <td class="text-end fw-semibold">@x.DonemSonuMiktar.ToString("N0")</td>
+                        <td class="text-end fw-semibold">@x.DonemSonuDeger.ToString("C2", tr)</td>
+                    </tr>
+                }
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="9" class="text-center text-muted py-4">Bu yıl için cetvel verisi bulunamadı.</td></tr>
+                }
+                </tbody>
+                <tfoot class="table-light fw-bold">
+                    <tr>
+                        <td colspan="4">GENEL TOPLAM</td>
+                        <td class="text-end">@Model.Sum(x => x.DevredenMiktar).ToString("N0")</td>
+                        <td class="text-end">@Model.Sum(x => x.GirisMiktar).ToString("N0")</td>
+                        <td class="text-end">@Model.Sum(x => x.CikisMiktar).ToString("N0")</td>
+                        <td class="text-end">@Model.Sum(x => x.DonemSonuMiktar).ToString("N0")</td>
+                        <td class="text-end">@Model.Sum(x => x.DonemSonuDeger).ToString("C2", tr)</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<p class="text-muted small mt-2">
+    <i class="bi bi-info-circle me-1"></i>
+    Devreden miktar ve değer, seçili yıl içindeki stok hareketleri ile mevcut dönem sonu stoklarından geriye doğru hesaplanır. Resmi kapanışta muhasebe entegrasyonu ve sayım onaylarıyla birlikte kullanılmalıdır.
+</p>

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using ATOM.Models.Accounts;
 using ATOM.Models.Domain;
 using ATOM.Services;
+using ClosedXML.Excel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -249,25 +250,19 @@ public class HomeController : Controller
     {
         if (dosya == null || dosya.Length == 0)
         {
-            TempData["Hata"] = "Lütfen bir CSV dosyası seçin.";
+            TempData["Hata"] = "Lütfen bir CSV veya Excel dosyası seçin.";
             return View();
         }
 
-        var satirlar = new List<string>();
-        using (var reader = new StreamReader(dosya.OpenReadStream(), System.Text.Encoding.UTF8))
-        {
-            string? line;
-            while ((line = await reader.ReadLineAsync()) != null) satirlar.Add(line);
-        }
+        var satirlar = await ImportSatirlariniOkuAsync(dosya);
         if (satirlar.Count < 2)
         {
             TempData["Hata"] = "Dosyada veri satırı yok.";
             return View();
         }
 
-        // Başlık eşleme (esnek: noktalı virgül veya virgül)
-        var ayrac = satirlar[0].Contains(';') ? ';' : ',';
-        var basliklar = satirlar[0].TrimStart('﻿').Split(ayrac).Select(b => b.Trim().ToLowerInvariant()).ToList();
+        // Başlık eşleme (CSV ve XLSX için aynı mantık)
+        var basliklar = satirlar[0].Select(b => b.Trim().TrimStart('﻿').ToLowerInvariant()).ToList();
         int Idx(params string[] adlar) => basliklar.FindIndex(b => adlar.Any(a => b == a));
 
         int iBarkod = Idx("bar_kod", "barkod"), iSicil = Idx("sicil_no", "sicilno"), iSeri = Idx("seri_no", "serino"),
@@ -284,8 +279,8 @@ public class HomeController : Controller
 
         for (int r = 1; r < satirlar.Count; r++)
         {
-            if (string.IsNullOrWhiteSpace(satirlar[r])) continue;
-            var c = satirlar[r].Split(ayrac);
+            var c = satirlar[r];
+            if (c.All(string.IsNullOrWhiteSpace)) continue;
             string Al(int idx) => (idx >= 0 && idx < c.Length) ? c[idx].Trim().Trim('"') : "";
 
             var barkod = Al(iBarkod);
@@ -322,6 +317,35 @@ public class HomeController : Controller
         ViewBag.Hatalar = hatalar;
         ViewBag.DosyaYuklendi = true;
         return View();
+    }
+
+    private static async Task<List<string[]>> ImportSatirlariniOkuAsync(IFormFile dosya)
+    {
+        var uzanti = Path.GetExtension(dosya.FileName).ToLowerInvariant();
+        if (uzanti == ".xlsx")
+        {
+            using var stream = dosya.OpenReadStream();
+            using var workbook = new XLWorkbook(stream);
+            var worksheet = workbook.Worksheets.First();
+            var range = worksheet.RangeUsed();
+            if (range == null) return new List<string[]>();
+
+            return range.Rows().Select(row =>
+                row.Cells(1, range.ColumnCount())
+                    .Select(cell => cell.GetFormattedString().Trim())
+                    .ToArray()).ToList();
+        }
+
+        var satirlar = new List<string[]>();
+        using var reader = new StreamReader(dosya.OpenReadStream(), System.Text.Encoding.UTF8);
+        string? line;
+        char? ayrac = null;
+        while ((line = await reader.ReadLineAsync()) != null)
+        {
+            ayrac ??= line.Contains(';') ? ';' : ',';
+            satirlar.Add(line.Split(ayrac.Value).Select(x => x.Trim()).ToArray());
+        }
+        return satirlar;
     }
 
     private async Task DropdownDoldur()

@@ -97,6 +97,20 @@ public class HomeController : Controller
         return View(ihale);
     }
 
+    [Authorize(Roles = $"{AtomRoller.BakanlikSatinAlma},{AtomRoller.BakanlikMerkez},{AtomRoller.SistemAdmin}")]
+    public async Task<IActionResult> TeklifKiyas(string id)
+    {
+        var ihale = await _svc.IhaleGetirAsync(id);
+        if (ihale == null) return NotFound();
+        var tanimlar = await _svc.TasinirTanimlariGetirAsync();
+        var firmalar = await _svc.FirmalariGetirAsync();
+
+        ViewBag.Tanimlar = tanimlar.ToDictionary(t => t.Id, t => new { t.Ad, t.Birim });
+        ViewBag.Firmalar = firmalar.ToDictionary(f => f.Id, f => f.Ad);
+        ViewBag.EnDusukTeklif = ihale.Teklifler.Any() ? ihale.Teklifler.Min(t => t.ToplamTutar) : 0m;
+        return View(ihale);
+    }
+
     [HttpPost]
     [Authorize(Roles = $"{AtomRoller.BakanlikSatinAlma},{AtomRoller.SistemAdmin}")]
     public async Task<IActionResult> Ilan(string id)

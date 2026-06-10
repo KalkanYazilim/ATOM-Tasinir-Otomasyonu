@@ -57,7 +57,7 @@ public class HomeController : Controller
             foreach (var s in d.Stoklar)
             {
                 var t = tanimlar.FirstOrDefault(x => x.Id == s.TasinirTanimId);
-                satirlar.Add(new List<object?> { kurum?.Ad, d.Ad, t?.Kod, t?.Ad, t?.Kategori.ToString(),
+                satirlar.Add(new List<object?> { kurum?.Ad, d.Ad, t?.Kod, t?.Ad, t != null ? TasinirKategoriHelper.DisplayName(t.Kategori) : "",
                     s.Miktar, t?.Birim, s.MinEsik, s.BirimMaliyet, s.Miktar * s.BirimMaliyet,
                     (s.MinEsik > 0 && s.Miktar <= s.MinEsik) ? "KRİTİK" : "Normal" });
             }
@@ -106,7 +106,7 @@ public class HomeController : Controller
                 {
                     HesapKodu = g.Key,
                     Ad = tanim?.Ad ?? g.Key,
-                    Kategori = tanim?.Kategori.ToString() ?? "",
+                    Kategori = tanim != null ? TasinirKategoriHelper.DisplayName(tanim.Kategori) : "",
                     ToplamMiktar = g.Sum(x => x.Miktar),
                     ToplamDeger = g.Sum(x => x.Miktar * x.BirimMaliyet)
                 };
@@ -140,6 +140,239 @@ public class HomeController : Controller
         return File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", $"tasinir-icmal-{DateTime.Now:yyyyMMdd}.docx");
     }
 
+    // ─── Taşınır Yönetim Hesabı Cetveli (yıl/dönem bazlı) ─────
+    private async Task<List<YonetimHesabiSatir>> YonetimHesabiVerisiAsync(int yil)
+    {
+        var depolar = await _svc.DepolariGetirAsync();
+        var tanimlar = await _svc.TasinirTanimlariGetirAsync();
+        var hareketler = await _svc.StokHareketleriGetirAsync();
+
+        if (!Bakanlik)
+        {
+            depolar = depolar.Where(d => d.KurumId == KurumId).ToList();
+            var yetkiliDepolar = depolar.Select(d => d.Id).ToHashSet();
+            hareketler = hareketler.Where(h => yetkiliDepolar.Contains(h.DepoId)).ToList();
+        }
+
+        var yilHareketleri = hareketler.Where(h => h.Tarih.Year == yil).ToList();
+        var mevcutStok = depolar.SelectMany(d => d.Stoklar)
+            .GroupBy(s => s.TasinirTanimId)
+            .ToDictionary(g => g.Key, g => new
+            {
+                Miktar = g.Sum(x => x.Miktar),
+                Deger = g.Sum(x => x.Miktar * x.BirimMaliyet)
+            });
+
+        var tumTanimIds = mevcutStok.Keys
+            .Concat(yilHareketleri.Select(h => h.TasinirTanimId))
+            .Distinct()
+            .ToList();
+
+        return tumTanimIds.Select(tanimId =>
+        {
+            var tanim = tanimlar.FirstOrDefault(t => t.Id == tanimId);
+            var hareket = yilHareketleri.Where(h => h.TasinirTanimId == tanimId).ToList();
+            var girisMiktar = hareket.Sum(h => h.GirisMiktar);
+            var cikisMiktar = hareket.Sum(h => h.CikisMiktar);
+            var girisDeger = hareket.Where(h => h.GirisMiktar > 0).Sum(h => h.ToplamTutar);
+            var cikisDeger = hareket.Where(h => h.CikisMiktar > 0).Sum(h => h.ToplamTutar);
+            var donemSonuMiktar = mevcutStok.TryGetValue(tanimId, out var stok) ? stok.Miktar : 0;
+            var donemSonuDeger = stok?.Deger ?? 0m;
+
+            return new YonetimHesabiSatir
+            {
+                HesapKodu = tanim?.Kod ?? "Tanımsız",
+                TasinirAdi = tanim?.Ad ?? tanimId,
+                Kategori = tanim != null ? TasinirKategoriHelper.DisplayName(tanim.Kategori) : "",
+                Birim = tanim?.Birim ?? "",
+                DevredenMiktar = donemSonuMiktar - girisMiktar + cikisMiktar,
+                DevredenDeger = donemSonuDeger - girisDeger + cikisDeger,
+                GirisMiktar = girisMiktar,
+                GirisDeger = girisDeger,
+                CikisMiktar = cikisMiktar,
+                CikisDeger = cikisDeger,
+                DonemSonuMiktar = donemSonuMiktar,
+                DonemSonuDeger = donemSonuDeger
+            };
+        }).OrderBy(x => x.HesapKodu).ThenBy(x => x.TasinirAdi).ToList();
+    }
+
+    public async Task<IActionResult> YonetimHesabiCetveli(int? yil = null)
+    {
+        var seciliYil = yil ?? DateTime.Now.Year;
+        var veri = await YonetimHesabiVerisiAsync(seciliYil);
+        ViewBag.Yil = seciliYil;
+        ViewBag.Yillar = Enumerable.Range(DateTime.Now.Year - 5, 7).OrderByDescending(x => x).ToList();
+        return View(veri);
+    }
+
+    public async Task<IActionResult> YonetimHesabiExcel(int? yil = null)
+    {
+        var seciliYil = yil ?? DateTime.Now.Year;
+        var veri = await YonetimHesabiVerisiAsync(seciliYil);
+        var basliklar = new List<string>
+        {
+            "Hesap Kodu", "Taşınır", "Kategori", "Birim", "Devreden Miktar", "Devreden Değer",
+            "Yıl İçi Giriş", "Giriş Değeri", "Yıl İçi Çıkış", "Çıkış Değeri", "Dönem Sonu Miktar", "Dönem Sonu Değer"
+        };
+        var satirlar = veri.Select(x => (IList<object?>)new List<object?>
+        {
+            x.HesapKodu, x.TasinirAdi, x.Kategori, x.Birim, x.DevredenMiktar, x.DevredenDeger,
+            x.GirisMiktar, x.GirisDeger, x.CikisMiktar, x.CikisDeger, x.DonemSonuMiktar, x.DonemSonuDeger
+        });
+        var bytes = _belge.ExcelTablo("Taşınır Yönetim Hesabı", basliklar, satirlar);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"tasinir-yonetim-hesabi-{seciliYil}.xlsx");
+    }
+
+    public async Task<IActionResult> YonetimHesabiWord(int? yil = null)
+    {
+        var seciliYil = yil ?? DateTime.Now.Year;
+        var veri = await YonetimHesabiVerisiAsync(seciliYil);
+        var basliklar = new List<string>
+        {
+            "Hesap Kodu", "Taşınır", "Devreden", "Giriş", "Çıkış", "Dönem Sonu", "Dönem Sonu Değer"
+        };
+        var satirlar = veri.Select(x => (IList<string>)new List<string>
+        {
+            x.HesapKodu, x.TasinirAdi, x.DevredenMiktar.ToString("N0"), x.GirisMiktar.ToString("N0"),
+            x.CikisMiktar.ToString("N0"), x.DonemSonuMiktar.ToString("N0"), x.DonemSonuDeger.ToString("N2")
+        });
+        var bytes = _belge.WordTablo("TAŞINIR YÖNETİM HESABI CETVELİ",
+            $"{seciliYil} yılı · Toplam dönem sonu değer: {veri.Sum(x => x.DonemSonuDeger):N2} ₺",
+            basliklar, satirlar, "Dayanak: 5018 sayılı Kanun, Taşınır Mal Yönetmeliği ve taşınır yönetim hesabı cetvelleri.");
+        return File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", $"tasinir-yonetim-hesabi-{seciliYil}.docx");
+    }
+
+    // ─── Muhasebe İcmali (hesap kodu bazlı borç/alacak) ───────
+    private async Task<List<MuhasebeIcmalSatir>> MuhasebeIcmalVerisiAsync(int yil)
+    {
+        var depolar = await _svc.DepolariGetirAsync();
+        var tanimlar = await _svc.TasinirTanimlariGetirAsync();
+        var hareketler = await _svc.StokHareketleriGetirAsync();
+
+        if (!Bakanlik)
+        {
+            var yetkiliDepolar = depolar.Where(d => d.KurumId == KurumId).Select(d => d.Id).ToHashSet();
+            hareketler = hareketler.Where(h => yetkiliDepolar.Contains(h.DepoId)).ToList();
+        }
+
+        return hareketler.Where(h => h.Tarih.Year == yil)
+            .GroupBy(h =>
+            {
+                var tanim = tanimlar.FirstOrDefault(t => t.Id == h.TasinirTanimId);
+                return new
+                {
+                    HesapKodu = tanim?.Kod ?? "Tanımsız",
+                    HesapAdi = tanim?.Kategori == TasinirKategori.Kirtasiye ? "Tüketim Malzemeleri" : "Dayanıklı Taşınırlar",
+                    Kategori = tanim != null ? TasinirKategoriHelper.DisplayName(tanim.Kategori) : ""
+                };
+            })
+            .Select(g => new MuhasebeIcmalSatir
+            {
+                HesapKodu = g.Key.HesapKodu,
+                HesapAdi = g.Key.HesapAdi,
+                Kategori = g.Key.Kategori,
+                GirisMiktar = g.Sum(x => x.GirisMiktar),
+                CikisMiktar = g.Sum(x => x.CikisMiktar),
+                Borc = g.Where(x => x.GirisMiktar > 0).Sum(x => x.ToplamTutar),
+                Alacak = g.Where(x => x.CikisMiktar > 0).Sum(x => x.ToplamTutar)
+            })
+            .OrderBy(x => x.HesapKodu)
+            .ToList();
+    }
+
+    public async Task<IActionResult> MuhasebeIcmali(int? yil = null)
+    {
+        var seciliYil = yil ?? DateTime.Now.Year;
+        var veri = await MuhasebeIcmalVerisiAsync(seciliYil);
+        ViewBag.Yil = seciliYil;
+        ViewBag.Yillar = Enumerable.Range(DateTime.Now.Year - 5, 7).OrderByDescending(x => x).ToList();
+        return View(veri);
+    }
+
+    public async Task<IActionResult> MuhasebeIcmaliExcel(int? yil = null)
+    {
+        var seciliYil = yil ?? DateTime.Now.Year;
+        var veri = await MuhasebeIcmalVerisiAsync(seciliYil);
+        var basliklar = new List<string> { "Hesap Kodu", "Hesap Adı", "Kategori", "Giriş Miktar", "Çıkış Miktar", "Borç", "Alacak", "Net" };
+        var satirlar = veri.Select(x => (IList<object?>)new List<object?>
+        {
+            x.HesapKodu, x.HesapAdi, x.Kategori, x.GirisMiktar, x.CikisMiktar, x.Borc, x.Alacak, x.Net
+        });
+        var bytes = _belge.ExcelTablo("Muhasebe İcmali", basliklar, satirlar);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"muhasebe-icmali-{seciliYil}.xlsx");
+    }
+
+    public async Task<IActionResult> MuhasebeIcmaliWord(int? yil = null)
+    {
+        var seciliYil = yil ?? DateTime.Now.Year;
+        var veri = await MuhasebeIcmalVerisiAsync(seciliYil);
+        var basliklar = new List<string> { "Hesap Kodu", "Hesap Adı", "Giriş", "Çıkış", "Borç", "Alacak", "Net" };
+        var satirlar = veri.Select(x => (IList<string>)new List<string>
+        {
+            x.HesapKodu, x.HesapAdi, x.GirisMiktar.ToString("N0"), x.CikisMiktar.ToString("N0"),
+            x.Borc.ToString("N2"), x.Alacak.ToString("N2"), x.Net.ToString("N2")
+        });
+        var bytes = _belge.WordTablo("TAŞINIR MUHASEBE İCMALİ",
+            $"{seciliYil} yılı · Borç: {veri.Sum(x => x.Borc):N2} ₺ · Alacak: {veri.Sum(x => x.Alacak):N2} ₺",
+            basliklar, satirlar,
+            "Dayanak: Genel Yönetim Muhasebe Yönetmeliği, Merkezî Yönetim Muhasebe Yönetmeliği ve Taşınır Mal Yönetmeliği.");
+        return File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", $"muhasebe-icmali-{seciliYil}.docx");
+    }
+
+    // ─── Tedarikçi Performans Raporu ─────────────────────────
+    public async Task<IActionResult> TedarikciPerformans()
+    {
+        var firmalar = await _svc.FirmalariGetirAsync();
+        var ihaleler = await _svc.IhaleleriGetirAsync();
+
+        var veri = firmalar.Select(f =>
+        {
+            var teklifliIhaleler = ihaleler.Where(i => i.Teklifler.Any(t => t.FirmaId == f.Id)).ToList();
+            var kazanilan = ihaleler.Count(i => i.KazananFirmaId == f.Id);
+            var teklifSayisi = teklifliIhaleler.Sum(i => i.Teklifler.Count(t => t.FirmaId == f.Id));
+            var kabulTeklifleri = teklifliIhaleler.SelectMany(i => i.Teklifler).Where(t => t.FirmaId == f.Id && t.Durum == TeklifDurumu.Kabul).ToList();
+            return new TedarikciPerformansSatir
+            {
+                FirmaId = f.Id,
+                FirmaAdi = f.Ad,
+                VergiNo = f.VergiNo,
+                PuanOrtalama = f.PuanOrtalama,
+                TamamlananIhale = f.TamamlananIhale,
+                TeklifSayisi = teklifSayisi,
+                KazanilanIhale = kazanilan,
+                KazanmaOrani = teklifliIhaleler.Count == 0 ? 0 : kazanilan * 100.0 / teklifliIhaleler.Count,
+                KabulEdilenTeklifTutari = kabulTeklifleri.Sum(t => t.ToplamTutar)
+            };
+        }).OrderByDescending(x => x.KazanilanIhale).ThenByDescending(x => x.PuanOrtalama).ToList();
+
+        return View(veri);
+    }
+
+    // ─── Talep Karşılama Süresi Raporu ───────────────────────
+    public async Task<IActionResult> TalepKarsilamaSuresi()
+    {
+        var talepler = await _svc.TalepleriGetirAsync();
+        var kurumlar = await _svc.KurumlariGetirAsync();
+        if (!Bakanlik) talepler = talepler.Where(t => t.TalepciKurumId == KurumId).ToList();
+
+        var veri = talepler.Select(t => new TalepKarsilamaSatir
+        {
+            TalepNo = t.TalepNo,
+            KurumAdi = kurumlar.FirstOrDefault(k => k.Id == t.TalepciKurumId)?.Ad ?? t.TalepciKurumId,
+            TalepTarihi = t.TalepTarihi,
+            KapanmaTarihi = t.KapanmaTarihi,
+            Durum = t.Durum.ToString(),
+            Oncelik = t.OncelikSeviyesi,
+            KalemSayisi = t.Kalemler.Count,
+            ToplamMiktar = t.Kalemler.Sum(k => k.TalepMiktari),
+            KarsilananMiktar = t.Kalemler.Sum(k => k.KarsilananMiktar)
+        }).OrderByDescending(x => x.TalepTarihi).ToList();
+
+        ViewBag.OrtalamaGun = veri.Where(x => x.KarsilamaGun.HasValue).Select(x => x.KarsilamaGun!.Value).DefaultIfEmpty(0).Average();
+        return View(veri);
+    }
+
     // ─── Stok Raporu CSV ──────────────────────────────────────
     public async Task<IActionResult> StokCsv()
     {
@@ -155,7 +388,7 @@ public class HomeController : Controller
             foreach (var s in d.Stoklar)
             {
                 var t = tanimlar.FirstOrDefault(x => x.Id == s.TasinirTanimId);
-                satirlar.Add(new object?[] { kurum?.Ad, d.Ad, t?.Kod, t?.Ad, t?.Kategori, s.Miktar, t?.Birim,
+                satirlar.Add(new object?[] { kurum?.Ad, d.Ad, t?.Kod, t?.Ad, t != null ? TasinirKategoriHelper.DisplayName(t.Kategori) : "", s.Miktar, t?.Birim,
                     s.MinEsik, s.BirimMaliyet, s.Miktar * s.BirimMaliyet,
                     (s.MinEsik > 0 && s.Miktar <= s.MinEsik) ? "KRİTİK" : "" });
             }
@@ -244,7 +477,7 @@ public class HomeController : Controller
                 Satirlar = d.Stoklar.Select(s => new StokSatir
                 {
                     TasinirAdi = tanimlar.FirstOrDefault(t => t.Id == s.TasinirTanimId)?.Ad ?? s.TasinirTanimId,
-                    Kategori = tanimlar.FirstOrDefault(t => t.Id == s.TasinirTanimId)?.Kategori.ToString() ?? "",
+                    Kategori = tanimlar.FirstOrDefault(t => t.Id == s.TasinirTanimId) is { } tanim ? TasinirKategoriHelper.DisplayName(tanim.Kategori) : "",
                     Miktar = s.Miktar,
                     MinEsik = s.MinEsik,
                     BirimMaliyet = s.BirimMaliyet,
@@ -372,4 +605,60 @@ public class IcmalSatir
     public string Kategori { get; set; } = "";
     public int ToplamMiktar { get; set; }
     public decimal ToplamDeger { get; set; }
+}
+
+public class YonetimHesabiSatir
+{
+    public string HesapKodu { get; set; } = "";
+    public string TasinirAdi { get; set; } = "";
+    public string Kategori { get; set; } = "";
+    public string Birim { get; set; } = "";
+    public int DevredenMiktar { get; set; }
+    public decimal DevredenDeger { get; set; }
+    public int GirisMiktar { get; set; }
+    public decimal GirisDeger { get; set; }
+    public int CikisMiktar { get; set; }
+    public decimal CikisDeger { get; set; }
+    public int DonemSonuMiktar { get; set; }
+    public decimal DonemSonuDeger { get; set; }
+}
+
+public class MuhasebeIcmalSatir
+{
+    public string HesapKodu { get; set; } = "";
+    public string HesapAdi { get; set; } = "";
+    public string Kategori { get; set; } = "";
+    public int GirisMiktar { get; set; }
+    public int CikisMiktar { get; set; }
+    public decimal Borc { get; set; }
+    public decimal Alacak { get; set; }
+    public decimal Net => Borc - Alacak;
+}
+
+public class TedarikciPerformansSatir
+{
+    public string FirmaId { get; set; } = "";
+    public string FirmaAdi { get; set; } = "";
+    public string VergiNo { get; set; } = "";
+    public double PuanOrtalama { get; set; }
+    public int TamamlananIhale { get; set; }
+    public int TeklifSayisi { get; set; }
+    public int KazanilanIhale { get; set; }
+    public double KazanmaOrani { get; set; }
+    public decimal KabulEdilenTeklifTutari { get; set; }
+}
+
+public class TalepKarsilamaSatir
+{
+    public string TalepNo { get; set; } = "";
+    public string KurumAdi { get; set; } = "";
+    public DateTime TalepTarihi { get; set; }
+    public DateTime? KapanmaTarihi { get; set; }
+    public string Durum { get; set; } = "";
+    public string Oncelik { get; set; } = "";
+    public int KalemSayisi { get; set; }
+    public int ToplamMiktar { get; set; }
+    public int KarsilananMiktar { get; set; }
+    public int? KarsilamaGun => KapanmaTarihi.HasValue ? (int)(KapanmaTarihi.Value.Date - TalepTarihi.Date).TotalDays : null;
+    public double KarsilamaOrani => ToplamMiktar == 0 ? 0 : KarsilananMiktar * 100.0 / ToplamMiktar;
 }

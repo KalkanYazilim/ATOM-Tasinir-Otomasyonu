@@ -1,0 +1,127 @@
+@model Ihale
+@using ATOM.Models.Domain
+@{
+    ViewData["Title"] = $"Teklif Kıyas – {Model.IhaleNo}";
+    var tanimlar = ViewBag.Tanimlar as Dictionary<string, dynamic> ?? new();
+    var firmalar = ViewBag.Firmalar as Dictionary<string, string> ?? new();
+    var enDusuk = (decimal)(ViewBag.EnDusukTeklif ?? 0m);
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+    double FiyatPuani(IhaleTeklif t) => t.FiyatPuani > 0
+        ? t.FiyatPuani
+        : (t.ToplamTutar > 0 && enDusuk > 0 ? Math.Round((double)(enDusuk / t.ToplamTutar * 100m), 2) : 0);
+    double GenelPuan(IhaleTeklif t)
+    {
+        if (t.GenelPuan > 0) return t.GenelPuan;
+        var fiyat = FiyatPuani(t);
+        return Math.Round((t.TeknikUygunlukPuani * .35) + (fiyat * .40) + (t.TeslimPuani * .15) + (t.GarantiPuani * .10), 2);
+    }
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/ihale">İhaleler</a></li>
+        <li class="breadcrumb-item"><a href="/ihale/Home/Detay/@Model.Id">@Model.IhaleNo</a></li>
+        <li class="breadcrumb-item active">Teklif Kıyas</li>
+    </ol>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h5 class="mb-1 fw-bold"><i class="bi bi-bar-chart-steps me-2 text-primary"></i>Teklif Değerlendirme Kıyas Tablosu</h5>
+        <div class="text-muted small">@Model.IhaleNo – @Model.Baslik</div>
+    </div>
+    <a href="/ihale/Home/Detay/@Model.Id" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Detaya Dön</a>
+</div>
+
+<div class="alert alert-info small">
+    <strong>Değerlendirme yöntemi:</strong> Genel puan yoksa ekranda teknik %35, fiyat %40, teslim %15, garanti %10 ağırlığıyla gösterge puanı hesaplanır.
+    Fiyat puanı, en düşük geçerli toplam teklifin ilgili teklife oranına göre otomatik hesaplanır.
+</div>
+
+<div class="card mb-3">
+    <div class="card-header bg-white fw-semibold"><i class="bi bi-trophy me-2"></i>Firma Bazlı Kıyas</div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Firma</th>
+                        <th class="text-end">Toplam Tutar</th>
+                        <th class="text-center">Teknik</th>
+                        <th class="text-center">Fiyat</th>
+                        <th class="text-center">Teslim</th>
+                        <th class="text-center">Garanti</th>
+                        <th class="text-center">Genel</th>
+                        <th>Durum</th>
+                        <th>Not</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var t in Model.Teklifler.OrderByDescending(GenelPuan).ThenBy(x => x.ToplamTutar))
+                {
+                    var kazanan = t.Id == Model.KazananTeklifId;
+                    <tr class="@(kazanan ? "table-success" : "")">
+                        <td class="fw-semibold">@(firmalar.TryGetValue(t.FirmaId, out var f) ? f : t.FirmaId) @(kazanan ? "🏆" : "")</td>
+                        <td class="text-end">@t.ToplamTutar.ToString("C2", tr)</td>
+                        <td class="text-center">@t.TeknikUygunlukPuani.ToString("N1")</td>
+                        <td class="text-center">@FiyatPuani(t).ToString("N1")</td>
+                        <td class="text-center">@t.TeslimPuani.ToString("N1")</td>
+                        <td class="text-center">@t.GarantiPuani.ToString("N1")</td>
+                        <td class="text-center fw-bold">@GenelPuan(t).ToString("N1")</td>
+                        <td><span class="badge bg-@(t.Durum==TeklifDurumu.Kabul?"success":t.Durum==TeklifDurumu.Red?"danger":"secondary")">@t.Durum</span></td>
+                        <td class="small text-muted">@(!string.IsNullOrWhiteSpace(t.DegerlendirmeNotu) ? t.DegerlendirmeNotu : t.Aciklama)</td>
+                    </tr>
+                }
+                @if (!Model.Teklifler.Any())
+                {
+                    <tr><td colspan="9" class="text-center text-muted py-4">Henüz teklif yok.</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-white fw-semibold"><i class="bi bi-list-ul me-2"></i>Kalem Bazlı Fiyat Karşılaştırması</div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>İhale Kalemi</th>
+                        <th class="text-center">Miktar</th>
+                        @foreach (var teklif in Model.Teklifler.OrderBy(t => t.ToplamTutar))
+                        {
+                            <th class="text-end">@(firmalar.TryGetValue(teklif.FirmaId, out var f) ? f : teklif.FirmaId)</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var kalem in Model.Kalemler)
+                {
+                    <tr>
+                        <td>@(tanimlar.TryGetValue(kalem.TasinirTanimId, out var tanim) ? (string)tanim.Ad : kalem.TasinirTanimId)</td>
+                        <td class="text-center">@kalem.Miktar</td>
+                        @foreach (var teklif in Model.Teklifler.OrderBy(t => t.ToplamTutar))
+                        {
+                            var teklifKalemi = teklif.Kalemler.FirstOrDefault(k => k.TasinirTanimId == kalem.TasinirTanimId);
+                            <td class="text-end">
+                                @if (teklifKalemi != null)
+                                {
+                                    <div class="fw-semibold">@teklifKalemi.BirimFiyat.ToString("C2", tr)</div>
+                                    <div class="text-muted small">@teklifKalemi.ToplamFiyat.ToString("C2", tr)</div>
+                                    <div class="text-muted small">@teklifKalemi.Marka @teklifKalemi.Model</div>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">Teklif yok</span>
+                                }
+                            </td>
+                        }
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

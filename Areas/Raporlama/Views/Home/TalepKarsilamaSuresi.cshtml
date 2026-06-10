@@ -1,0 +1,63 @@
+@model List<ATOM.Areas.Raporlama.Controllers.TalepKarsilamaSatir>
+@{
+    ViewData["Title"] = "Talep Karşılama Süresi Raporu";
+    var ortalamaGun = (double)(ViewBag.OrtalamaGun ?? 0d);
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/raporlama">Raporlar</a></li>
+        <li class="breadcrumb-item active">Talep Karşılama Süresi</li>
+    </ol>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-hourglass-split me-2 text-primary"></i>Talep Karşılama Süresi Raporu</h5>
+    <span class="badge bg-primary">Ortalama @ortalamaGun.ToString("N1") gün</span>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Talep No</th>
+                        <th>Kurum</th>
+                        <th>Öncelik</th>
+                        <th>Durum</th>
+                        <th class="text-center">Talep Tarihi</th>
+                        <th class="text-center">Kapanış</th>
+                        <th class="text-center">Gün</th>
+                        <th class="text-center">Karşılama</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var x in Model)
+                {
+                    <tr>
+                        <td class="fw-semibold">@x.TalepNo</td>
+                        <td>@x.KurumAdi</td>
+                        <td><span class="badge bg-light text-dark">@x.Oncelik</span></td>
+                        <td>@x.Durum</td>
+                        <td class="text-center">@x.TalepTarihi.ToString("dd.MM.yyyy")</td>
+                        <td class="text-center">@(x.KapanmaTarihi?.ToString("dd.MM.yyyy") ?? "Açık")</td>
+                        <td class="text-center">@(x.KarsilamaGun?.ToString() ?? "–")</td>
+                        <td class="text-center">
+                            <div class="progress" style="height:6px;">
+                                <div class="progress-bar bg-success" style="width:@Math.Min(100, x.KarsilamaOrani).ToString("N0")%"></div>
+                            </div>
+                            <span class="small">@x.KarsilananMiktar / @x.ToplamMiktar (@x.KarsilamaOrani.ToString("N1")%)</span>
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="8" class="text-center text-muted py-4">Talep kaydı yok.</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<p class="text-muted small mt-2"><i class="bi bi-info-circle me-1"></i>5018 kapsamındaki kaynak kullanım etkinliği ve hizmet sürekliliği takibi için talep-karşılama performansı gösterilir.</p>
