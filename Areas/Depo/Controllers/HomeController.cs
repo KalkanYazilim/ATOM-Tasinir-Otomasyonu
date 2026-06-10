@@ -79,6 +79,25 @@ public class HomeController : Controller
         return File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", $"TIF-{mk.MalKabulNo}.docx");
     }
 
+    public async Task<IActionResult> MuayeneTutanak(string id)
+    {
+        var mk = await _svc.MalKabulGetirAsync(id);
+        if (mk == null) return NotFound();
+        var tanimlar = await _svc.TasinirTanimlariGetirAsync();
+        var firma = (await _svc.FirmalariGetirAsync()).FirstOrDefault(f => f.Id == mk.FirmaId);
+        var basliklar = new List<string> { "S.No", "Taşınır", "Sipariş", "Teslim", "Kabul", "Red", "Red Gerekçe" };
+        int sira = 0;
+        var satirlar = mk.Kalemler.Select(k => (IList<string>)new List<string>
+        {
+            (++sira).ToString(), tanimlar.FirstOrDefault(t => t.Id == k.TasinirTanimId)?.Ad ?? k.TasinirTanimId,
+            k.SiparisEdilen.ToString(), k.TeslimEdilen.ToString(), k.KabulEdilen.ToString(), k.Reddedilen.ToString(), k.RedGerekce ?? ""
+        });
+        var bytes = _belge.WordTablo("MUAYENE VE KABUL TUTANAĞI",
+            $"Mal Kabul: {mk.MalKabulNo} · Firma: {firma?.Ad} · Fatura: {mk.FaturaNo} · Tarih: {mk.TeslimTarihi:dd.MM.yyyy}",
+            basliklar, satirlar, "Dayanak: Mal Alımları Denetim, Muayene ve Kabul İşlemlerine Dair Yönetmelik (4734/4735 sK)");
+        return File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", $"MuayeneKabul-{mk.MalKabulNo}.docx");
+    }
+
     public async Task<IActionResult> SevkIrsaliye(string id)
     {
         var sevk = await _svc.SevkGetirAsync(id);

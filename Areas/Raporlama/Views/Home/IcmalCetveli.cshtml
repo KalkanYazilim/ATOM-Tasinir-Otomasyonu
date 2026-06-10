@@ -1,0 +1,38 @@
+@model List<ATOM.Areas.Raporlama.Controllers.IcmalSatir>
+@{
+    ViewData["Title"] = "Taşınır İcmal Cetveli";
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+    var genelToplam = (decimal)(ViewBag.GenelToplam ?? 0m);
+}
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/raporlama">Raporlar</a></li><li class="breadcrumb-item active">Taşınır İcmal Cetveli</li></ol> }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-table me-2 text-primary"></i>Taşınır İcmal Cetveli
+        <span class="text-muted fw-normal small">(hesap kodu bazlı)</span></h5>
+    <div class="d-flex gap-2">
+        <a href="/raporlama/Home/IcmalCetveliExcel" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+        <a href="/raporlama/Home/IcmalCetveliWord" class="btn btn-outline-primary btn-sm"><i class="bi bi-file-earmark-word me-1"></i>Word</a>
+        <button onclick="window.print()" class="btn btn-outline-secondary btn-sm"><i class="bi bi-printer me-1"></i>Yazdır</button>
+    </div>
+</div>
+
+<div class="card"><div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+        <thead class="table-light"><tr><th>Hesap Kodu</th><th>Taşınır</th><th>Kategori</th><th class="text-end">Toplam Miktar</th><th class="text-end">Toplam Değer</th></tr></thead>
+        <tbody>
+        @foreach (var x in Model)
+        {
+            <tr>
+                <td class="fw-semibold">@x.HesapKodu</td>
+                <td>@x.Ad</td>
+                <td><span class="badge bg-light text-dark">@x.Kategori</span></td>
+                <td class="text-end">@x.ToplamMiktar.ToString("N0")</td>
+                <td class="text-end fw-semibold">@x.ToplamDeger.ToString("C2", tr)</td>
+            </tr>
+        }
+        @if (!Model.Any()) { <tr><td colspan="5" class="text-center text-muted py-4">Kayıt yok.</td></tr> }
+        </tbody>
+        <tfoot class="table-light fw-bold"><tr><td colspan="3">GENEL TOPLAM</td><td class="text-end">@Model.Sum(x => x.ToplamMiktar).ToString("N0")</td><td class="text-end">@genelToplam.ToString("C2", tr)</td></tr></tfoot>
+    </table>
+</div></div></div>
+<p class="text-muted small mt-2"><i class="bi bi-info-circle me-1"></i>Dayanak: Taşınır Mal Yönetmeliği – Taşınır Yönetim Hesabı Cetvelleri (5018 sayılı Kanun)</p>

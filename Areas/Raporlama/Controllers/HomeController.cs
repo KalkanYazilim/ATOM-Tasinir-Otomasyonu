@@ -89,6 +89,57 @@ public class HomeController : Controller
         return File(bytes, "application/pdf", $"stok-raporu-{DateTime.Now:yyyyMMdd}.pdf");
     }
 
+    // ─── Taşınır İcmal Cetveli (hesap kodu bazlı, dinamik) ────
+    private async Task<List<IcmalSatir>> IcmalVerisiAsync()
+    {
+        var depolar = await _svc.DepolariGetirAsync();
+        var tanimlar = await _svc.TasinirTanimlariGetirAsync();
+        if (!Bakanlik) depolar = depolar.Where(d => d.KurumId == KurumId).ToList();
+
+        // Hesap kodunun ilk 3 segmenti = taşınır hesap grubu (ör. 255.01.01 → 255 Demirbaşlar)
+        return depolar.SelectMany(d => d.Stoklar)
+            .GroupBy(s => tanimlar.FirstOrDefault(t => t.Id == s.TasinirTanimId)?.Kod ?? "Tanımsız")
+            .Select(g =>
+            {
+                var tanim = tanimlar.FirstOrDefault(t => t.Id == g.First().TasinirTanimId);
+                return new IcmalSatir
+                {
+                    HesapKodu = g.Key,
+                    Ad = tanim?.Ad ?? g.Key,
+                    Kategori = tanim?.Kategori.ToString() ?? "",
+                    ToplamMiktar = g.Sum(x => x.Miktar),
+                    ToplamDeger = g.Sum(x => x.Miktar * x.BirimMaliyet)
+                };
+            }).OrderBy(x => x.HesapKodu).ToList();
+    }
+
+    public async Task<IActionResult> IcmalCetveli()
+    {
+        var veri = await IcmalVerisiAsync();
+        ViewBag.GenelToplam = veri.Sum(x => x.ToplamDeger);
+        return View(veri);
+    }
+
+    public async Task<IActionResult> IcmalCetveliExcel()
+    {
+        var veri = await IcmalVerisiAsync();
+        var basliklar = new List<string> { "Hesap Kodu", "Taşınır", "Kategori", "Toplam Miktar", "Toplam Değer (₺)" };
+        var satirlar = veri.Select(x => (IList<object?>)new List<object?> { x.HesapKodu, x.Ad, x.Kategori, x.ToplamMiktar, x.ToplamDeger });
+        var bytes = _belge.ExcelTablo("Taşınır İcmal", basliklar, satirlar);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"tasinir-icmal-{DateTime.Now:yyyyMMdd}.xlsx");
+    }
+
+    public async Task<IActionResult> IcmalCetveliWord()
+    {
+        var veri = await IcmalVerisiAsync();
+        var basliklar = new List<string> { "Hesap Kodu", "Taşınır", "Miktar", "Değer (₺)" };
+        var satirlar = veri.Select(x => (IList<string>)new List<string> { x.HesapKodu, x.Ad, x.ToplamMiktar.ToString("N0"), x.ToplamDeger.ToString("N2") });
+        var bytes = _belge.WordTablo("TAŞINIR İCMAL CETVELİ",
+            $"Genel Toplam: {veri.Sum(x => x.ToplamDeger):N2} ₺ · Tarih: {DateTime.Now:dd.MM.yyyy}",
+            basliklar, satirlar, "Dayanak: Taşınır Mal Yönetmeliği – Taşınır Yönetim Hesabı Cetvelleri (5018 sayılı Kanun)");
+        return File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", $"tasinir-icmal-{DateTime.Now:yyyyMMdd}.docx");
+    }
+
     // ─── Stok Raporu CSV ──────────────────────────────────────
     public async Task<IActionResult> StokCsv()
     {
@@ -312,4 +363,13 @@ public class IlStokKarsilastirma
     public int ToplamAdet { get; set; }
     public decimal ToplamDeger { get; set; }
     public int KritikSayisi { get; set; }
+}
+
+public class IcmalSatir
+{
+    public string HesapKodu { get; set; } = "";
+    public string Ad { get; set; } = "";
+    public string Kategori { get; set; } = "";
+    public int ToplamMiktar { get; set; }
+    public decimal ToplamDeger { get; set; }
 }

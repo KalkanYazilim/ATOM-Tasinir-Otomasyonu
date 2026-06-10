@@ -16,11 +16,27 @@ public class HomeController : Controller
     private readonly ITasinirKayitService _kayit;
     private readonly IBildirimService _bildirim;
     private readonly IAuditService _audit;
+    private readonly BelgeService _belge;
 
     public HomeController(IAtomDataService svc, IStokService stok,
-        ITasinirKayitService kayit, IBildirimService bildirim, IAuditService audit)
+        ITasinirKayitService kayit, IBildirimService bildirim, IAuditService audit, BelgeService belge)
     {
-        _svc = svc; _stok = stok; _kayit = kayit; _bildirim = bildirim; _audit = audit;
+        _svc = svc; _stok = stok; _kayit = kayit; _bildirim = bildirim; _audit = audit; _belge = belge;
+    }
+
+    public async Task<IActionResult> KomisyonTutanak(string id)
+    {
+        var h = await _svc.HurdaKaydiGetirAsync(id);
+        if (h == null) return NotFound();
+        var tanimlar = await _svc.TasinirTanimlariGetirAsync();
+        var basliklar = new List<string> { "S.No", "Taşınır", "Seri No", "Miktar", "Durum Açıklama" };
+        int sira = 0;
+        var satirlar = h.Kalemler.Select(k => (IList<string>)new List<string>
+        { (++sira).ToString(), tanimlar.FirstOrDefault(t => t.Id == k.TasinirTanimId)?.Ad ?? k.TasinirTanimId, k.SeriNo, k.Miktar.ToString(), k.DurumAciklama });
+        var bytes = _belge.WordTablo($"{h.DusumTuru.ToUpper()} KOMİSYON TUTANAĞI",
+            $"Belge No: {h.HurdaNo} · Tür: {h.DusumTuru} · Komisyon Kararı: {h.KomisyonKarari} · Tarih: {(h.KomisyonTarihi ?? h.TalepTarihi):dd.MM.yyyy}",
+            basliklar, satirlar, "Dayanak: Taşınır Mal Yönetmeliği – Kayıttan Düşme Teklif ve Onay Tutanağı");
+        return File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", $"{h.DusumTuru}-Tutanak-{h.HurdaNo}.docx");
     }
 
     private string KullaniciId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;

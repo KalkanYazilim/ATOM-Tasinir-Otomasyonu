@@ -17,6 +17,7 @@
     <h5 class="mb-0 fw-bold"><i class="bi bi-trash3 me-2 text-primary"></i>@Model.HurdaNo
         <span class="badge bg-secondary ms-1">@Model.DusumTuru</span></h5>
     <div class="d-flex gap-2">
+        <a href="/hurda/Home/KomisyonTutanak/@Model.Id" class="btn btn-outline-primary btn-sm"><i class="bi bi-file-earmark-word me-1"></i>Komisyon Tutanağı</a>
         @if (komisyon && Model.Durum == HurdaDurumu.Talep)
         { <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#komisyonModal">Komisyon Kararı</button> }
         @if (ustOnay && Model.Durum == HurdaDurumu.Komisyon)
