@@ -201,6 +201,11 @@
                href="@Url.Action("Index","Dashboard")">
                 <i class="bi bi-speedometer2"></i> Gösterge Paneli
             </a>
+            @if (rol != AtomRoller.Tedarikci && rol != AtomRoller.Personel && rol != AtomRoller.Teknisyen)
+            {
+                <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Operasyon" ? "active" : "")"
+                   href="/Operasyon"><i class="bi bi-grid-1x2"></i> Operasyon Panosu</a>
+            }
 
             @if (rol != AtomRoller.Tedarikci)
             {
@@ -218,6 +223,7 @@
                 <a class="nav-link" href="/depo"><i class="bi bi-building"></i> Depo & Stok</a>
                 <a class="nav-link" href="/depo/Home/Sevkler"><i class="bi bi-truck"></i> Sevk İşlemleri</a>
                 <a class="nav-link" href="/depo/Home/MalKabuller"><i class="bi bi-box-arrow-in-down"></i> Mal Kabul</a>
+                <a class="nav-link" href="/depo/Home/TuketimCikisi"><i class="bi bi-box-arrow-up"></i> Tüketim Çıkışı</a>
             }
 
             <div class="nav-section">Zimmet</div>
@@ -248,6 +254,7 @@
                 <a class="nav-link" href="/yonetim/Home/Firmalar"><i class="bi bi-briefcase"></i> Firmalar</a>
                 <a class="nav-link" href="/yonetim/Home/TasinirTanimlar"><i class="bi bi-tags"></i> Taşınır Tanımları</a>
                 <a class="nav-link" href="/yonetim/Home/AuditLog"><i class="bi bi-journal-text"></i> İşlem Kayıtları</a>
+                <a class="nav-link" href="/resmi-yazi"><i class="bi bi-file-earmark-text"></i> Resmi Yazı (EBYS)</a>
             }
         </div>
     </nav>

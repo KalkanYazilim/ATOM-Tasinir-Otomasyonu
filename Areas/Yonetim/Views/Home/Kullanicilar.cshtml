@@ -29,7 +29,16 @@
                         <td><span class="badge bg-secondary">@AtomRoller.DisplayName(k.Rol)</span></td>
                         <td class="small">@(kurumlar.TryGetValue(k.KurumId, out var km) ? km : k.KurumId)</td>
                         <td><span class="badge bg-@(k.AktifMi?"success":"danger")">@(k.AktifMi?"Aktif":"Pasif")</span></td>
-                        <td><a href="/yonetim/Home/KullaniciDuzenle/@k.Id" class="btn btn-sm btn-outline-secondary">Düzenle</a></td>
+                        <td class="d-flex gap-1">
+                            <a href="/yonetim/Home/KullaniciDuzenle/@k.Id" class="btn btn-sm btn-outline-secondary">Düzenle</a>
+                            <form method="post" action="/yonetim/Home/KullaniciPasiflestir" onsubmit="return confirm('@(k.AktifMi ? "Pasifleştirilsin mi? (silinmez)" : "Aktifleştirilsin mi?")');">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@k.Id"/>
+                                <button class="btn btn-sm btn-outline-@(k.AktifMi?"danger":"success")" title="@(k.AktifMi?"Pasifleştir":"Aktifleştir")">
+                                    <i class="bi bi-@(k.AktifMi?"pause-circle":"play-circle")"></i>
+                                </button>
+                            </form>
+                        </td>
                     </tr>
                 }
             </tbody>

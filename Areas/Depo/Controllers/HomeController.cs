@@ -119,6 +119,50 @@ public class HomeController : Controller
         return File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", $"Sevk-{sevk.SevkNo}.docx");
     }
 
+    // ─── Tüketim Malzemesi Çıkışı (sarf — Taşınır İstek/Çıkış) ─
+    [HttpGet]
+    [Authorize(Roles = $"{AtomRoller.MerkezDepoSorumlusu},{AtomRoller.IlDepoSorumlusu},{AtomRoller.IlMuduru},{AtomRoller.SistemAdmin}")]
+    public async Task<IActionResult> TuketimCikisi()
+    {
+        var depolar = await _svc.DepolariGetirAsync();
+        var tanimlar = await _svc.TasinirTanimlariGetirAsync();
+        if (!AtomRoller.BakanlikRolleri.Contains(Rol)) depolar = depolar.Where(d => d.KurumId == KurumId).ToList();
+        ViewBag.Depolar = depolar;
+        // Sadece sarf (demirbaş olmayan) tanımlar
+        ViewBag.SarfTanimlar = tanimlar.Where(t => !t.DemirbasMi && t.AktifMi).ToList();
+        return View();
+    }
+
+    [HttpPost]
+    [Authorize(Roles = $"{AtomRoller.MerkezDepoSorumlusu},{AtomRoller.IlDepoSorumlusu},{AtomRoller.IlMuduru},{AtomRoller.SistemAdmin}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TuketimCikisi(string depoId, string tanimId, int miktar, string birim, string kullanimYeri)
+    {
+        var depo = await _svc.DepoGetirAsync(depoId);
+        if (depo == null) { TempData["Hata"] = "Depo bulunamadı."; return RedirectToAction(nameof(TuketimCikisi)); }
+        if (!AtomRoller.BakanlikRolleri.Contains(Rol) && depo.KurumId != KurumId) return Forbid();
+
+        var mevcut = await _stok.MevcutStokAsync(depoId, tanimId);
+        if (mevcut < miktar)
+        {
+            var tnm = await _svc.TasinirTanimGetirAsync(tanimId);
+            TempData["Hata"] = $"Yetersiz stok: '{tnm?.Ad}' mevcut {mevcut}, istenen {miktar}.";
+            return RedirectToAction(nameof(TuketimCikisi));
+        }
+
+        var belgeNo = await _svc.YeniNumaraUretAsync("TKT");
+        await _stok.CikisYapAsync(new StokHareketIstegi
+        {
+            DepoId = depoId, TasinirTanimId = tanimId, Miktar = miktar, IslemTuru = StokIslemTuru.TuketimCikisi,
+            KaynakBelgeTur = "Tüketim", KaynakBelgeId = belgeNo, KaynakBelgeNo = belgeNo,
+            KullaniciId = KullaniciId, KullaniciAdi = AdSoyad,
+            Aciklama = $"Tüketim çıkışı — Birim: {birim}, Kullanım: {kullanimYeri}"
+        });
+        await _audit.KaydetAsync(User, "Tüketim", "Çıkış", "StokHareket", belgeNo, $"{belgeNo} tüketim çıkışı ({miktar} adet)", ip: Ip);
+        TempData["Basari"] = $"{belgeNo} numaralı tüketim çıkışı yapıldı, stok düşüldü.";
+        return RedirectToAction(nameof(TuketimCikisi));
+    }
+
     // ─── Stok Kartı / Hareket Geçmişi ─────────────────────────
     public async Task<IActionResult> StokKart(string depoId, string tanimId)
     {

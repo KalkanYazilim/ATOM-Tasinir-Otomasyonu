@@ -1,0 +1,175 @@
+@model List<ATOM.Models.Domain.Depo>
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@{
+    ViewData["Title"] = "Operasyon Panosu";
+    var tanimlar = ViewBag.Tanimlar as Dictionary<string, TasinirTanim> ?? new();
+    var personeller = ViewBag.Personeller as List<AtomKullanici> ?? new();
+    var depoTekiller = ViewBag.DepoTekiller as Dictionary<string, List<TasinirKayit>> ?? new();
+    string TanimAd(string id) => tanimlar.TryGetValue(id, out var t) ? t.Ad : id;
+}
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item active">Operasyon Panosu</li></ol> }
+
+@Html.AntiForgeryToken()
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-grid-1x2 me-2 text-primary"></i>Operasyon Panosu
+        <span class="text-muted fw-normal small">— sürükle-bırak ile sevk / zimmet / hurda</span></h5>
+</div>
+<div class="alert alert-info py-2 small">
+    <i class="bi bi-info-circle me-1"></i>
+    <strong>Sarf</strong> kalemini başka depoya sürükle → <strong>sevk</strong>.
+    <strong>Demirbaş</strong> kartını bir personele sürükle → <strong>zimmet</strong>.
+    Herhangi bir kalemi <strong>Hurda</strong> alanına sürükle → <strong>düşüm talebi</strong>.
+    Tüm işlemler stok/taşınır servislerinden geçer, negatif stok engellenir.
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-9">
+        <div class="row g-3">
+        @foreach (var depo in Model)
+        {
+            <div class="col-md-6">
+                <div class="card h-100 depo-kart" data-depo="@depo.Id" ondragover="izinVer(event)" ondrop="depoyaBirak(event,'@depo.Id','@depo.Ad')">
+                    <div class="card-header bg-primary text-white fw-semibold d-flex justify-content-between">
+                        <span><i class="bi bi-building me-2"></i>@depo.Ad</span>
+                        <span class="badge bg-light text-dark">@depo.Stoklar.Sum(s => s.Miktar) adet</span>
+                    </div>
+                    <div class="card-body p-2">
+                        <div class="text-muted small mb-1"><i class="bi bi-box-seam me-1"></i>Sarf / Stok</div>
+                        <div class="d-flex flex-wrap gap-1 mb-2">
+                        @foreach (var s in depo.Stoklar.Where(x => x.Miktar > 0))
+                        {
+                            var t = tanimlar.GetValueOrDefault(s.TasinirTanimId);
+                            if (t?.DemirbasMi == true) { continue; }
+                            <span class="chip sarf" draggable="true"
+                                  ondragstart="surukleBasla(event,'sarf','@depo.Id','@s.TasinirTanimId','','@(t?.Ad)','@s.Miktar')">
+                                @if (!string.IsNullOrEmpty(t?.ResimUrl)) { <img src="@t.ResimUrl" class="chip-img"/> } else { <i class="bi bi-box"></i> }
+                                @TanimAd(s.TasinirTanimId) <b>×@s.Miktar</b>
+                            </span>
+                        }
+                        </div>
+                        <div class="text-muted small mb-1"><i class="bi bi-upc-scan me-1"></i>Demirbaş (tekil)</div>
+                        <div class="d-flex flex-wrap gap-1">
+                        @if (depoTekiller.TryGetValue(depo.Id, out var tekiller))
+                        {
+                            foreach (var k in tekiller.Take(40))
+                            {
+                                var t = tanimlar.GetValueOrDefault(k.TasinirTanimId ?? "");
+                                <span class="chip demirbas" draggable="true" title="@k.SicilNo"
+                                      ondragstart="surukleBasla(event,'demirbas','@depo.Id','@(k.TasinirTanimId)','@k.Id','@k.Cinsi','1')">
+                                    @if (!string.IsNullOrEmpty(k.ResimUrl ?? t?.ResimUrl)) { <img src="@(k.ResimUrl ?? t?.ResimUrl)" class="chip-img"/> } else { <i class="bi bi-cpu"></i> }
+                                    @k.Cinsi <span class="text-muted">@k.SicilNo</span>
+                                </span>
+                            }
+                        }
+                        else { <span class="text-muted small">Tekil demirbaş yok.</span> }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+        @if (!Model.Any()) { <div class="col-12"><div class="alert alert-warning">Görüntülenecek depo yok.</div></div> }
+        </div>
+    </div>
+
+    <div class="col-lg-3">
+        <!-- Personel drop zone -->
+        <div class="card mb-3">
+            <div class="card-header bg-success text-white fw-semibold"><i class="bi bi-people me-2"></i>Personel (zimmet)</div>
+            <div class="card-body p-2" style="max-height:340px;overflow:auto;">
+                @foreach (var p in personeller)
+                {
+                    <div class="drop-personel mb-1 p-2 rounded border d-flex align-items-center gap-2"
+                         data-personel="@p.Id" ondragover="izinVer(event)" ondrop="personeleBirak(event,'@p.Id','@p.AdSoyad')">
+                        <i class="bi bi-person-circle text-success"></i>
+                        <span class="small">@p.AdSoyad</span>
+                    </div>
+                }
+                @if (!personeller.Any()) { <div class="text-muted small">Personel yok.</div> }
+            </div>
+        </div>
+        <!-- Hurda drop zone -->
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white fw-semibold"><i class="bi bi-trash3 me-2"></i>Hurda / Düşüm Alanı</div>
+            <div class="card-body text-center py-4 drop-hurda" ondragover="izinVer(event)" ondrop="hurdayaBirak(event)">
+                <i class="bi bi-trash display-5 text-danger opacity-50"></i>
+                <div class="small text-muted mt-2">Düşülecek kalemi buraya bırakın</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="position-fixed bottom-0 end-0 m-3 p-3 rounded text-white shadow" style="display:none;z-index:2000;min-width:280px;"></div>
+
+@section Styles {
+<style>
+    .chip { display:inline-flex; align-items:center; gap:5px; padding:4px 8px; border-radius:1rem; font-size:.78rem;
+            cursor:grab; user-select:none; border:1px solid #cfd8e3; background:#fff; }
+    .chip.sarf { background:#eef5ff; border-color:#bcd6f5; }
+    .chip.demirbas { background:#fff7e6; border-color:#f0d9a8; }
+    .chip:active { cursor:grabbing; }
+    .chip-img { width:20px; height:20px; object-fit:cover; border-radius:3px; }
+    .depo-kart.dragover { outline:3px dashed #0d6efd; outline-offset:-3px; }
+    .drop-personel.dragover { background:#d1e7dd; outline:2px dashed #198754; }
+    .drop-hurda.dragover { background:#f8d7da; outline:2px dashed #dc3545; }
+</style>
+}
+
+@section Scripts {
+<script>
+let sur = null;
+const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+
+function surukleBasla(e, tip, depo, tanim, kayit, ad, max) {
+    sur = { tip, depo, tanim, kayit, ad, max: parseInt(max) || 0 };
+    e.dataTransfer.effectAllowed = 'move';
+}
+function izinVer(e) { e.preventDefault(); e.currentTarget.classList.add('dragover'); }
+document.addEventListener('dragleave', e => { if (e.target.classList) e.target.classList.remove('dragover'); });
+document.addEventListener('drop', e => document.querySelectorAll('.dragover').forEach(x => x.classList.remove('dragover')));
+
+function toast(ok, msg) {
+    const t = document.getElementById('toast');
+    t.style.background = ok ? '#198754' : '#dc3545';
+    t.innerHTML = (ok ? '<i class="bi bi-check-circle me-2"></i>' : '<i class="bi bi-x-circle me-2"></i>') + msg;
+    t.style.display = 'block';
+    if (ok) setTimeout(() => location.reload(), 1400);
+    else setTimeout(() => t.style.display = 'none', 4000);
+}
+async function gonder(url, data) {
+    const body = new URLSearchParams(data);
+    body.append('__RequestVerificationToken', token);
+    const r = await fetch(url, { method:'POST', body, headers:{'X-Requested-With':'XMLHttpRequest'} });
+    const j = await r.json();
+    toast(j.ok, j.msg);
+}
+
+function depoyaBirak(e, hedefDepo, hedefAd) {
+    e.preventDefault();
+    if (!sur) return;
+    if (sur.tip !== 'sarf') { toast(false, 'Depoya yalnızca sarf kalemi sürüklenebilir (demirbaş → personel/hurda).'); return; }
+    if (sur.depo === hedefDepo) { toast(false, 'Aynı depo.'); return; }
+    let m = prompt(`${sur.ad} → ${hedefAd}\nSevk miktarı (max ${sur.max}):`, '1');
+    if (m === null) return;
+    m = parseInt(m); if (!m || m < 1 || m > sur.max) { toast(false, 'Geçersiz miktar.'); return; }
+    gonder('/Operasyon/SevkYap', { kaynakDepoId: sur.depo, hedefDepoId: hedefDepo, tanimId: sur.tanim, miktar: m });
+}
+function personeleBirak(e, personelId, personelAd) {
+    e.preventDefault();
+    if (!sur) return;
+    if (sur.tip !== 'demirbas') { toast(false, 'Personele yalnızca tekil demirbaş zimmetlenir.'); return; }
+    if (!confirm(`${sur.ad} → ${personelAd}\nZimmet oluşturulsun mu?`)) return;
+    gonder('/Operasyon/ZimmetYap', { tasinirKayitId: sur.kayit, personelId });
+}
+function hurdayaBirak(e) {
+    e.preventDefault();
+    if (!sur) return;
+    const g = prompt(`${sur.ad} için hurda/düşüm gerekçesi:`, 'Ekonomik ömrünü doldurdu');
+    if (g === null) return;
+    let m = sur.tip === 'sarf' ? (parseInt(prompt(`Miktar (max ${sur.max}):`, '1')) || 0) : 1;
+    if (sur.tip === 'sarf' && (m < 1 || m > sur.max)) { toast(false, 'Geçersiz miktar.'); return; }
+    gonder('/Operasyon/HurdaYap', { depoId: sur.depo, tanimId: sur.tanim, miktar: m, tasinirKayitId: sur.kayit || '', gerekce: g });
+}
+</script>
+}

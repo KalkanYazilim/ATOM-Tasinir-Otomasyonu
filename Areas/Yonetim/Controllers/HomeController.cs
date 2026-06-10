@@ -66,6 +66,47 @@ public class HomeController : Controller
         return RedirectToAction(nameof(Kullanicilar));
     }
 
+    // ─── Pasifleştirme (fiziksel silme yerine) ────────────────
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> KullaniciPasiflestir(string id)
+    {
+        var k = await _svc.KullaniciGetirAsync(id);
+        if (k != null) { k.AktifMi = !k.AktifMi; await _svc.KullaniciKaydetAsync(k);
+            TempData["Basari"] = k.AktifMi ? "Kullanıcı aktifleştirildi." : "Kullanıcı pasifleştirildi (silinmedi)."; }
+        return RedirectToAction(nameof(Kullanicilar));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> KurumPasiflestir(string id)
+    {
+        var k = await _svc.KurumGetirAsync(id);
+        if (k != null) { k.AktifMi = !k.AktifMi; await _svc.KurumKaydetAsync(k);
+            TempData["Basari"] = k.AktifMi ? "Kurum aktifleştirildi." : "Kurum pasifleştirildi (silinmedi)."; }
+        return RedirectToAction(nameof(Kurumlar));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> FirmaPasiflestir(string id)
+    {
+        var f = await _svc.FirmaGetirAsync(id);
+        if (f != null) { f.AktifMi = !f.AktifMi; await _svc.FirmaKaydetAsync(f);
+            TempData["Basari"] = f.AktifMi ? "Firma aktifleştirildi." : "Firma pasifleştirildi (silinmedi)."; }
+        return RedirectToAction(nameof(Firmalar));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TanimPasiflestir(string id)
+    {
+        var t = await _svc.TasinirTanimGetirAsync(id);
+        if (t != null) { t.AktifMi = !t.AktifMi; await _svc.TasinirTanimKaydetAsync(t);
+            TempData["Basari"] = t.AktifMi ? "Tanım aktifleştirildi." : "Tanım pasifleştirildi (silinmedi)."; }
+        return RedirectToAction(nameof(TasinirTanimlar));
+    }
+
     public async Task<IActionResult> Kurumlar()
     {
         var liste = await _svc.KurumlariGetirAsync();

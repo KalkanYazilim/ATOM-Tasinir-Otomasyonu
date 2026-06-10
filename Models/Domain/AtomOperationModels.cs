@@ -8,7 +8,7 @@ public enum StokIslemTuru
 {
     SatinAlmaGirisi, DevirGirisi, BagisGirisi, SayimFazlasi,
     SevkCikisi, SevkGirisi, ZimmetCikisi, ZimmetIadesi,
-    HurdaDusum, Kayip, BakimCikisi, BakimDonusu, Duzeltme, AcilisGirisi
+    HurdaDusum, Kayip, BakimCikisi, BakimDonusu, Duzeltme, AcilisGirisi, TuketimCikisi
 }
 
 public class StokHareket
@@ -48,6 +48,7 @@ public class StokHareket
         StokIslemTuru.BakimDonusu => "Bakım Dönüşü",
         StokIslemTuru.Duzeltme => "Düzeltme",
         StokIslemTuru.AcilisGirisi => "Açılış Girişi",
+        StokIslemTuru.TuketimCikisi => "Tüketim Çıkışı",
         _ => t.ToString()
     };
 }

@@ -1,0 +1,58 @@
+@{
+    ViewData["Title"] = "Resmi Yazı Oluştur";
+}
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item active">Resmi Yazı (EBYS)</li></ol> }
+
+<h5 class="mb-3 fw-bold"><i class="bi bi-file-earmark-text me-2 text-primary"></i>Resmi Yazı Oluştur <span class="text-muted fw-normal small">(Resmî Yazışma Yönetmeliği + 5070 e-imza)</span></h5>
+
+<div class="card"><div class="card-body">
+    <form method="post" action="/resmi-yazi">
+        @Html.AntiForgeryToken()
+        <div class="row g-3">
+            <div class="col-md-8"><label class="form-label small fw-semibold">Kurum</label>
+                <input name="kurum" value="@ViewBag.KurumAdi" class="form-control form-control-sm" required/></div>
+            <div class="col-md-4"><label class="form-label small fw-semibold">Şablon</label>
+                <select id="sablon" class="form-select form-select-sm" onchange="sablonUygula()">
+                    <option value="">– Boş –</option>
+                    <option value="talep">Taşınır Talep Yazısı</option>
+                    <option value="devir">İhtiyaç Fazlası Devir Yazısı</option>
+                    <option value="genel">Genel Yazı</option>
+                </select></div>
+            <div class="col-md-6"><label class="form-label small fw-semibold">Muhatap <span class="text-danger">*</span></label>
+                <input name="muhatap" id="muhatap" class="form-control form-control-sm" placeholder="... BAKANLIĞINA / ... VALİLİĞİNE" required/></div>
+            <div class="col-md-6"><label class="form-label small fw-semibold">Konu <span class="text-danger">*</span></label>
+                <input name="konu" id="konu" class="form-control form-control-sm" required/></div>
+            <div class="col-12"><label class="form-label small fw-semibold">İlgi</label>
+                <input name="ilgi" id="ilgi" class="form-control form-control-sm" placeholder="a) ... b) ..."/></div>
+            <div class="col-12"><label class="form-label small fw-semibold">Yazı Gövdesi <span class="text-danger">*</span></label>
+                <textarea name="govde" id="govde" rows="7" class="form-control form-control-sm" required></textarea></div>
+            <div class="col-md-6"><label class="form-label small fw-semibold">İmza – Ad Soyad</label>
+                <input name="imzaAd" value="@ViewBag.ImzaAd" class="form-control form-control-sm"/></div>
+            <div class="col-md-6"><label class="form-label small fw-semibold">İmza – Unvan</label>
+                <input name="imzaUnvan" class="form-control form-control-sm" placeholder="Daire Başkanı / İl Müdürü"/></div>
+        </div>
+        <p class="text-muted small mt-3"><i class="bi bi-info-circle me-1"></i>Belge otomatik sayı + elektronik imza doğrulama kodu ile Word (.docx) olarak üretilir.</p>
+        <button class="btn btn-primary btn-sm"><i class="bi bi-file-earmark-word me-1"></i>Resmi Yazı Üret (Word)</button>
+    </form>
+</div></div>
+
+@section Scripts {
+<script>
+function sablonUygula() {
+    const v = document.getElementById('sablon').value;
+    const konu = document.getElementById('konu'), govde = document.getElementById('govde'), muhatap = document.getElementById('muhatap');
+    if (v === 'talep') {
+        konu.value = 'Taşınır Mal Talebi';
+        muhatap.value = '... BAKANLIĞINA';
+        govde.value = 'İlimiz/Birimimiz ihtiyacı için aşağıda cinsi ve miktarı belirtilen taşınırların tahsis/temin edilmesi hususunda;\nGereğini arz/rica ederim.';
+    } else if (v === 'devir') {
+        konu.value = 'İhtiyaç Fazlası Taşınır Devri';
+        muhatap.value = '... VALİLİĞİNE';
+        govde.value = 'Kurumumuzda ihtiyaç fazlası durumda bulunan ve ekli listede belirtilen taşınırların, Taşınır Mal Yönetmeliği hükümleri çerçevesinde bedelsiz devri uygun görülmüştür.\nGereğini arz/rica ederim.';
+    } else if (v === 'genel') {
+        konu.value = '';
+        govde.value = '';
+    }
+}
+</script>
+}

@@ -191,6 +191,65 @@ public class BelgeService
         return new W.Paragraph(run);
     }
 
+    // ─── RESMİ YAZI (.docx) — Resmî Yazışma Yönetmeliği formatı ─
+    public byte[] WordResmiYazi(string kurum, string sayi, string konu, string ilgi,
+        string muhatap, string govde, string imzaAd, string imzaUnvan, string? dogrulamaKodu = null)
+    {
+        using var ms = new MemoryStream();
+        using (var wordDoc = WordprocessingDocument.Create(ms, WordprocessingDocumentType.Document))
+        {
+            var mainPart = wordDoc.AddMainDocumentPart();
+            mainPart.Document = new W.Document();
+            var body = mainPart.Document.AppendChild(new W.Body());
+
+            body.AppendChild(OrtaParagraf("T.C.", 22, true));
+            body.AppendChild(OrtaParagraf(kurum.ToUpper(), 22, true));
+            body.AppendChild(new W.Paragraph());
+
+            body.AppendChild(SatirParagraf($"Sayı : {sayi}", false));
+            body.AppendChild(SatirParagraf($"Konu : {konu}", false));
+            body.AppendChild(new W.Paragraph());
+            body.AppendChild(new W.Paragraph());
+
+            body.AppendChild(OrtaParagraf(muhatap.ToUpper(), 22, true));
+            body.AppendChild(new W.Paragraph());
+
+            if (!string.IsNullOrWhiteSpace(ilgi))
+            {
+                body.AppendChild(SatirParagraf($"İlgi : {ilgi}", false));
+                body.AppendChild(new W.Paragraph());
+            }
+
+            foreach (var p in govde.Split('\n'))
+                body.AppendChild(SatirParagraf("        " + p.Trim(), false));
+
+            body.AppendChild(new W.Paragraph());
+            body.AppendChild(new W.Paragraph());
+            var imza = new W.Paragraph(new W.ParagraphProperties(new W.Justification { Val = W.JustificationValues.Right }),
+                new W.Run(new W.RunProperties(new W.FontSize { Val = "22" }, new W.Bold()), new W.Text(imzaAd)));
+            body.AppendChild(imza);
+            body.AppendChild(new W.Paragraph(new W.ParagraphProperties(new W.Justification { Val = W.JustificationValues.Right }),
+                new W.Run(new W.RunProperties(new W.FontSize { Val = "20" }), new W.Text(imzaUnvan))));
+
+            if (!string.IsNullOrEmpty(dogrulamaKodu))
+            {
+                body.AppendChild(new W.Paragraph());
+                body.AppendChild(KucukParagraf($"Bu belge 5070 sayılı Kanun gereğince elektronik olarak imzalanmıştır. Doğrulama Kodu: {dogrulamaKodu}"));
+            }
+            mainPart.Document.Save();
+        }
+        return ms.ToArray();
+    }
+
+    private static W.Paragraph SatirParagraf(string metin)
+        => SatirParagraf(metin, false);
+    private static W.Paragraph SatirParagraf(string metin, bool kalin)
+    {
+        var props = new W.RunProperties(new W.FontSize { Val = "22" });
+        if (kalin) props.AppendChild(new W.Bold());
+        return new W.Paragraph(new W.Run(props, new W.Text(metin) { Space = SpaceProcessingModeValues.Preserve }));
+    }
+
     private static W.TableCell Hucre(string metin, bool kalin, string? arkaplan)
     {
         var props = new W.RunProperties(new W.FontSize { Val = "18" });
