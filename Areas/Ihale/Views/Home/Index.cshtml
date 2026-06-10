@@ -1,0 +1,101 @@
+@model List<Ihale>
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@using System.Security.Claims
+@{
+    ViewData["Title"] = "İhale Yönetimi";
+    var firmalar = ViewBag.Firmalar as Dictionary<string, string> ?? new();
+    var rol = User.FindFirstValue(ClaimTypes.Role) ?? "";
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/">Panel</a></li>
+        <li class="breadcrumb-item active">İhaleler</li>
+    </ol>
+}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-hammer me-2 text-primary"></i>İhale Yönetimi</h5>
+    @if (rol == AtomRoller.BakanlikSatinAlma || rol == AtomRoller.SistemAdmin)
+    {
+        <a href="/ihale/Home/Yeni" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Yeni İhale</a>
+    }
+</div>
+
+<!-- Durum Kartları -->
+<div class="row g-2 mb-3">
+    @{
+        var durumlar = new[] {
+            (IhaleDurumu.Hazirlaniyor,"secondary","Hazırlanıyor"),
+            (IhaleDurumu.IlanEdildi,"info","İlan Edildi"),
+            (IhaleDurumu.TeklifAliniyor,"warning","Teklif Alınıyor"),
+            (IhaleDurumu.Sonuclandi,"success","Sonuçlandı"),
+            (IhaleDurumu.KapandiTamamlandi,"success","Tamamlandı"),
+        };
+        foreach (var (d, c, l) in durumlar)
+        {
+            var cnt = Model.Count(i => i.Durum == d);
+            <div class="col">
+                <a href="/ihale?durum=@d" class="card text-center text-decoration-none">
+                    <div class="card-body py-2">
+                        <div class="fs-4 fw-bold text-@c">@cnt</div>
+                        <div class="text-muted small">@l</div>
+                    </div>
+                </a>
+            </div>
+        }
+    }
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>İhale No</th>
+                        <th>Başlık</th>
+                        <th class="text-center">Kalem</th>
+                        <th class="text-end">Tahmini Bütçe</th>
+                        <th>Durum</th>
+                        <th>Tarih</th>
+                        <th>Kazanan Firma</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Any())
+                    {
+                        <tr><td colspan="8" class="text-center text-muted py-4">Kayıt bulunamadı.</td></tr>
+                    }
+                    @foreach (var i in Model)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@i.IhaleNo</td>
+                            <td>@i.Baslik</td>
+                            <td class="text-center">@i.Kalemler.Count</td>
+                            <td class="text-end">@i.TahminiButce.ToString("C0", new System.Globalization.CultureInfo("tr-TR"))</td>
+                            <td>
+                                @{
+                                    var (bg, lbl) = i.Durum switch {
+                                        IhaleDurumu.Hazirlaniyor => ("secondary","Hazırlanıyor"),
+                                        IhaleDurumu.IlanEdildi => ("info","İlan Edildi"),
+                                        IhaleDurumu.TeklifAliniyor => ("warning","Teklif Alınıyor"),
+                                        IhaleDurumu.DegerlendiriliYor => ("primary","Değerlendiriliyor"),
+                                        IhaleDurumu.Sonuclandi => ("success","Sonuçlandı"),
+                                        IhaleDurumu.KapandiTamamlandi => ("success","Tamamlandı"),
+                                        IhaleDurumu.Iptal => ("danger","İptal"),
+                                        _ => ("secondary",i.Durum.ToString())
+                                    };
+                                }
+                                <span class="badge bg-@bg">@lbl</span>
+                            </td>
+                            <td class="text-muted small">@i.OlusturmaTarihi.ToString("dd.MM.yyyy")</td>
+                            <td class="small">@(i.KazananFirmaId != null && firmalar.TryGetValue(i.KazananFirmaId, out var fn) ? fn : "–")</td>
+                            <td><a href="/ihale/Home/Detay/@i.Id" class="btn btn-sm btn-outline-secondary">Detay</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

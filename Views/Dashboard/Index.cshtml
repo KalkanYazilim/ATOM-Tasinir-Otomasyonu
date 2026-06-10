@@ -1,0 +1,270 @@
+@model DashboardViewModel
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@using System.Security.Claims
+@{
+    ViewData["Title"] = "Gösterge Paneli";
+    var tarih = DateTime.Now.ToString("dd MMMM yyyy, dddd", new System.Globalization.CultureInfo("tr-TR"));
+}
+
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item active">Gösterge Paneli</li>
+    </ol>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="mb-0 fw-bold">Gösterge Paneli</h4>
+        <small class="text-muted">@tarih</small>
+    </div>
+    <span class="badge rounded-pill px-3 py-2" style="background:#1a3a6b;font-size:.8rem;">
+        @AtomRoller.DisplayName(Model.Rol)
+    </span>
+</div>
+
+<!-- STAT KARTLARI -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="card stat-card @(Model.BekleyenTalep > 0 ? "warning" : "")">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="text-muted small">Toplam Talep</div>
+                        <div class="fs-3 fw-bold">@Model.ToplamTalep</div>
+                        <div class="text-warning small">@Model.BekleyenTalep bekliyor</div>
+                    </div>
+                    <i class="bi bi-clipboard2-plus fs-2 text-warning opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card stat-card @(Model.AktifIhale > 0 ? "info" : "")">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="text-muted small">İhale</div>
+                        <div class="fs-3 fw-bold">@Model.ToplamIhale</div>
+                        <div class="text-info small">@Model.AktifIhale aktif</div>
+                    </div>
+                    <i class="bi bi-hammer fs-2 text-info opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card stat-card @(Model.KritikStokSayisi > 0 ? "danger" : "success")">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="text-muted small">Depo Stok</div>
+                        <div class="fs-3 fw-bold">@Model.ToplamDepoStokAdedi.ToString("N0")</div>
+                        @if (Model.KritikStokSayisi > 0)
+                        {
+                            <div class="text-danger small"><i class="bi bi-exclamation-triangle me-1"></i>@Model.KritikStokSayisi kritik</div>
+                        }
+                        else
+                        {
+                            <div class="text-success small">Stok sağlıklı</div>
+                        }
+                    </div>
+                    <i class="bi bi-box-seam fs-2 @(Model.KritikStokSayisi > 0 ? "text-danger" : "text-success") opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card stat-card @(Model.AcikBakim > 0 ? "danger" : "")">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="text-muted small">Zimmet / Bakım</div>
+                        <div class="fs-3 fw-bold">@Model.AktifZimmet</div>
+                        <div class="@(Model.AcikBakim > 0 ? "text-danger" : "text-muted") small">@Model.AcikBakim açık arıza</div>
+                    </div>
+                    <i class="bi bi-person-badge fs-2 text-secondary opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- GRAFİKLER -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header bg-white border-0 fw-semibold">
+                <i class="bi bi-graph-up me-2 text-primary"></i>Son 6 Ay Talep Trendi
+            </div>
+            <div class="card-body">
+                <canvas id="talepTrendiChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header bg-white border-0 fw-semibold">
+                <i class="bi bi-pie-chart me-2 text-primary"></i>Kategori Bazlı Stok
+            </div>
+            <div class="card-body d-flex align-items-center justify-content-center">
+                <canvas id="kategoriChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- DEPO ÖZET TABLOSU -->
+@if (Model.DepoStokOzeti.Any())
+{
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-white border-0 fw-semibold">
+                    <i class="bi bi-building me-2 text-primary"></i>Depo Durumu
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Depo</th>
+                                    <th class="text-center">Kalem Sayısı</th>
+                                    <th class="text-center">Toplam Adet</th>
+                                    <th class="text-end">Stok Değeri</th>
+                                    <th class="text-center">Kritik</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var d in Model.DepoStokOzeti)
+                                {
+                                    <tr>
+                                        <td class="fw-semibold">@d.DepoAdi</td>
+                                        <td class="text-center">@d.ToplamKalem</td>
+                                        <td class="text-center">@d.ToplamAdet.ToString("N0")</td>
+                                        <td class="text-end">@d.ToplamDeger.ToString("C0", new System.Globalization.CultureInfo("tr-TR"))</td>
+                                        <td class="text-center">
+                                            @if (d.KritikSayisi > 0)
+                                            {
+                                                <span class="badge bg-danger rounded-pill">@d.KritikSayisi kritik</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-success rounded-pill">Sağlıklı</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- SON TALEPLER & İHALELER -->
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-clipboard2-check me-2 text-primary"></i>Son Talepler</span>
+                <a href="/talep" class="btn btn-sm btn-outline-primary">Tümü</a>
+            </div>
+            <div class="card-body p-0">
+                @if (Model.SonTalepler.Any())
+                {
+                    <div class="list-group list-group-flush">
+                        @foreach (var t in Model.SonTalepler)
+                        {
+                            <a href="/talep/Home/Detay/@t.Id" class="list-group-item list-group-item-action py-2 px-3">
+                                <div class="d-flex justify-content-between">
+                                    <span class="fw-semibold small">@t.TalepNo</span>
+                                    @{
+                                        var (bgClass, label) = t.Durum switch {
+                                            TalepDurumu.Taslak => ("secondary", "Taslak"),
+                                            TalepDurumu.GonderildiIlOnay => ("warning", "İl Onayı"),
+                                            TalepDurumu.IlOnaylandi => ("info", "İl Onayladı"),
+                                            TalepDurumu.BakanlikAlindi => ("primary", "Bakanlıkta"),
+                                            TalepDurumu.BakanlikInceliyor => ("primary", "İncelemede"),
+                                            TalepDurumu.KarsilandiTamamen => ("success", "Karşılandı"),
+                                            TalepDurumu.Reddedildi => ("danger", "Reddedildi"),
+                                            _ => ("secondary", t.Durum.ToString())
+                                        };
+                                    }
+                                    <span class="badge bg-@bgClass">@label</span>
+                                </div>
+                                <div class="text-muted" style="font-size:.75rem;">@t.TalepTarihi.ToString("dd.MM.yyyy") · @t.Kalemler.Count kalem · @t.OncelikSeviyesi</div>
+                            </a>
+                        }
+                    </div>
+                }
+                else { <div class="text-muted text-center py-3 small">Talep bulunamadı.</div> }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-hammer me-2 text-primary"></i>Son İhaleler</span>
+                <a href="/ihale" class="btn btn-sm btn-outline-primary">Tümü</a>
+            </div>
+            <div class="card-body p-0">
+                @if (Model.SonIhaleler.Any())
+                {
+                    <div class="list-group list-group-flush">
+                        @foreach (var i in Model.SonIhaleler)
+                        {
+                            <a href="/ihale/Home/Detay/@i.Id" class="list-group-item list-group-item-action py-2 px-3">
+                                <div class="d-flex justify-content-between">
+                                    <span class="fw-semibold small">@i.IhaleNo</span>
+                                    @{
+                                        var (ibgClass, iLabel) = i.Durum switch {
+                                            IhaleDurumu.Hazirlaniyor => ("secondary", "Hazırlanıyor"),
+                                            IhaleDurumu.IlanEdildi => ("info", "İlan Edildi"),
+                                            IhaleDurumu.TeklifAliniyor => ("warning", "Teklif Alınıyor"),
+                                            IhaleDurumu.Sonuclandi => ("success", "Sonuçlandı"),
+                                            IhaleDurumu.KapandiTamamlandi => ("success", "Tamamlandı"),
+                                            IhaleDurumu.Iptal => ("danger", "İptal"),
+                                            _ => ("secondary", i.Durum.ToString())
+                                        };
+                                    }
+                                    <span class="badge bg-@ibgClass">@iLabel</span>
+                                </div>
+                                <div class="text-muted" style="font-size:.75rem;">@i.OlusturmaTarihi.ToString("dd.MM.yyyy") · @i.TahminiButce.ToString("C0", new System.Globalization.CultureInfo("tr-TR"))</div>
+                            </a>
+                        }
+                    </div>
+                }
+                else { <div class="text-muted text-center py-3 small">İhale bulunamadı.</div> }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+const trendiData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AylikTalepTrendi));
+new Chart(document.getElementById('talepTrendiChart'), {
+    type: 'bar',
+    data: {
+        labels: trendiData.map(x => x.ay),
+        datasets: [{ label: 'Talep Sayısı', data: trendiData.map(x => x.sayi),
+            backgroundColor: 'rgba(45,106,159,.7)', borderColor: '#1a3a6b', borderWidth: 1, borderRadius: 4 }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+});
+
+const kategoriData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.KategoriBazliStok));
+const colors = ['#1a3a6b','#2d6a9f','#e8a020','#198754','#dc3545','#0dcaf0','#6f42c1','#fd7e14'];
+new Chart(document.getElementById('kategoriChart'), {
+    type: 'doughnut',
+    data: {
+        labels: kategoriData.map(x => x.kategori),
+        datasets: [{ data: kategoriData.map(x => x.adet), backgroundColor: colors, borderWidth: 2 }]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } } }
+});
+</script>
+}

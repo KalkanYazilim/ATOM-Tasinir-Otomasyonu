@@ -1,0 +1,129 @@
+@model RaporlamaViewModel
+@using ATOM.Models.Domain
+@{
+    ViewData["Title"] = "Raporlar & Analiz";
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/">Panel</a></li>
+        <li class="breadcrumb-item active">Raporlar</li>
+    </ol>
+}
+<h5 class="mb-4 fw-bold"><i class="bi bi-bar-chart-line me-2 text-primary"></i>Raporlar & Analiz</h5>
+
+<!-- Özet Kartlar -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card info">
+            <div class="card-body text-center">
+                <div class="fs-3 fw-bold text-info">@Model.TalepOzeti.Toplam</div>
+                <div class="text-muted small">Toplam Talep</div>
+                <hr class="my-1"/>
+                <div class="small">@Model.TalepOzeti.Bekleyen bekleyen · @Model.TalepOzeti.Karsilanan karşılandı</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card warning">
+            <div class="card-body text-center">
+                <div class="fs-3 fw-bold text-warning">@Model.IhaleOzeti.Toplam</div>
+                <div class="text-muted small">Toplam İhale</div>
+                <hr class="my-1"/>
+                <div class="small">@Model.IhaleOzeti.Tamamlanan tamamlandı · %@Model.IhaleOzeti.GerceklesmeOrani.ToString("F0") oran</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card success">
+            <div class="card-body text-center">
+                <div class="fs-3 fw-bold text-success">@Model.IhaleOzeti.ToplamButce.ToString("C0",tr)</div>
+                <div class="text-muted small">Toplam İhale Bütçesi</div>
+                <hr class="my-1"/>
+                <div class="small">@Model.IhaleOzeti.Aktif aktif ihale</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card @(Model.BakimOzeti.Acik > 0 ? "danger" : "")">
+            <div class="card-body text-center">
+                <div class="fs-3 fw-bold @(Model.BakimOzeti.Acik>0?"text-danger":"")">@Model.BakimOzeti.Toplam</div>
+                <div class="text-muted small">Bakım Kaydı</div>
+                <hr class="my-1"/>
+                <div class="small">@Model.BakimOzeti.Acik açık · @Model.BakimOzeti.ToplamMaliyet.ToString("C0",tr)</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- İl Karşılaştırma Grafiği -->
+@if (Model.IlBazliStok.Any())
+{
+    <div class="card mb-4">
+        <div class="card-header bg-white fw-semibold">
+            <i class="bi bi-map me-2 text-primary"></i>İl Bazlı Stok Karşılaştırması
+        </div>
+        <div class="card-body">
+            <canvas id="ilStokChart" height="80"></canvas>
+        </div>
+    </div>
+}
+
+<!-- Stok Raporu -->
+@foreach (var d in Model.StokRaporu)
+{
+    <div class="card mb-3">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <span class="fw-semibold">@d.DepoAdi <small class="text-muted fw-normal ms-2">(@d.KurumAdi)</small></span>
+            <div class="d-flex gap-3 align-items-center text-muted small">
+                <span>@d.ToplamAdet.ToString("N0") adet</span>
+                <span>@d.ToplamDeger.ToString("C0",tr)</span>
+                @if (d.KritikSayisi > 0) { <span class="badge bg-danger">@d.KritikSayisi kritik</span> }
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr><th>Taşınır</th><th>Kategori</th><th class="text-center">Mevcut</th><th class="text-center">Min</th><th class="text-end">Birim</th><th class="text-end">Toplam Değer</th><th class="text-center">Durum</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in d.Satirlar.OrderBy(x => x.KritikMi ? 0 : 1))
+                        {
+                            <tr class="@(s.KritikMi ? "table-danger" : "")">
+                                <td>@s.TasinirAdi</td>
+                                <td class="small text-muted">@s.Kategori</td>
+                                <td class="text-center fw-semibold">@s.Miktar</td>
+                                <td class="text-center text-muted small">@s.MinEsik</td>
+                                <td class="text-end small">@s.BirimMaliyet.ToString("C0",tr)</td>
+                                <td class="text-end">@s.ToplamDeger.ToString("C0",tr)</td>
+                                <td class="text-center">
+                                    <span class="badge bg-@(s.KritikMi?"danger":"success")">@(s.KritikMi?"Kritik":"Normal")</span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+<script>
+const ilData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.IlBazliStok));
+if (ilData.length > 0) {
+    new Chart(document.getElementById('ilStokChart'), {
+        type: 'bar',
+        data: {
+            labels: ilData.map(x => x.ilAdi),
+            datasets: [
+                { label: 'Toplam Adet', data: ilData.map(x => x.toplamAdet), backgroundColor: 'rgba(45,106,159,.7)', borderRadius: 4 },
+                { label: 'Kritik Kalem', data: ilData.map(x => x.kritikSayisi), backgroundColor: 'rgba(220,53,69,.7)', borderRadius: 4 }
+            ]
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+    });
+}
+</script>
+}

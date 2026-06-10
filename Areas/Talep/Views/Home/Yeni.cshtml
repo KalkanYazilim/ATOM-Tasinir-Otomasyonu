@@ -1,0 +1,105 @@
+@model IhtiyacTalebi
+@using ATOM.Models.Domain
+@{
+    ViewData["Title"] = "Yeni İhtiyaç Talebi";
+    var tanimlar = ViewBag.Tanimlar as List<TasinirTanim> ?? new();
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/talep">Talepler</a></li>
+        <li class="breadcrumb-item active">Yeni Talep</li>
+    </ol>
+}
+<div class="row justify-content-center">
+<div class="col-lg-9">
+<div class="card">
+    <div class="card-header bg-white fw-semibold">
+        <i class="bi bi-clipboard2-plus me-2 text-primary"></i>Yeni İhtiyaç Talebi Oluştur
+    </div>
+    <div class="card-body">
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="alert alert-danger">
+                @foreach (var e in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                { <div>@e.ErrorMessage</div> }
+            </div>
+        }
+        <form method="post">
+            @Html.AntiForgeryToken()
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-8">
+                    <label class="form-label fw-semibold">Gerekçe / Açıklama <span class="text-danger">*</span></label>
+                    <textarea name="GerekceAciklama" class="form-control" rows="3" required></textarea>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Öncelik Seviyesi</label>
+                    <select name="OncelikSeviyesi" class="form-select">
+                        <option>Normal</option>
+                        <option>Yüksek</option>
+                        <option>Acil</option>
+                        <option>Düşük</option>
+                    </select>
+                </div>
+            </div>
+
+            <h6 class="fw-semibold mb-2 mt-4">Talep Kalemleri</h6>
+            <div id="kalemler">
+                <div class="row g-2 align-items-center mb-2 kalem-satir">
+                    <div class="col-md-5">
+                        <select name="tasinirIds[]" class="form-select form-select-sm" required>
+                            <option value="">– Taşınır Seçin –</option>
+                            @foreach (var t in tanimlar)
+                            {
+                                <option value="@t.Id">[@t.Kod] @t.Ad (@t.Birim)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" name="miktarlar[]" class="form-control form-control-sm" placeholder="Miktar" min="1" required/>
+                    </div>
+                    <div class="col-md-4">
+                        <input type="text" name="aciklamalar[]" class="form-control form-control-sm" placeholder="Teknik özellik / açıklama"/>
+                    </div>
+                    <div class="col-md-1">
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="satirSil(this)" disabled>
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="kalemEkle()">
+                <i class="bi bi-plus-lg me-1"></i>Kalem Ekle
+            </button>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save me-1"></i>Taslak Kaydet
+                </button>
+                <a href="/talep" class="btn btn-outline-secondary">İptal</a>
+            </div>
+        </form>
+    </div>
+</div>
+</div>
+</div>
+
+@section Scripts {
+<script>
+const tanimlar = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(tanimlar.Select(t => new { t.Id, ad = $"[{t.Kod}] {t.Ad} ({t.Birim})" })));
+
+function kalemEkle() {
+    const div = document.getElementById('kalemler');
+    const ilk = div.querySelector('.kalem-satir');
+    const yeni = ilk.cloneNode(true);
+    yeni.querySelectorAll('input').forEach(i => i.value = '');
+    yeni.querySelector('button').disabled = false;
+    div.appendChild(yeni);
+}
+
+function satirSil(btn) {
+    const satir = btn.closest('.kalem-satir');
+    satir.remove();
+}
+</script>
+}

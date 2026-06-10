@@ -1,0 +1,86 @@
+@model List<Depo>
+@using ATOM.Models.Domain
+@{
+    ViewData["Title"] = "Depo & Stok";
+    var kurumlar = ViewBag.Kurumlar as Dictionary<string, string> ?? new();
+    var tanimlar = ViewBag.Tanimlar as Dictionary<string, string> ?? new();
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/">Panel</a></li>
+        <li class="breadcrumb-item active">Depo & Stok</li>
+    </ol>
+}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-building me-2 text-primary"></i>Depo & Stok Yönetimi</h5>
+    <div class="d-flex gap-2">
+        <a href="/depo/Home/Sevkler" class="btn btn-outline-secondary btn-sm"><i class="bi bi-truck me-1"></i>Sevkler</a>
+        <a href="/depo/Home/MalKabuller" class="btn btn-outline-secondary btn-sm"><i class="bi bi-box-arrow-in-down me-1"></i>Mal Kabuller</a>
+    </div>
+</div>
+
+@foreach (var depo in Model)
+{
+    var toplam = depo.Stoklar.Sum(s => s.Miktar);
+    var deger = depo.Stoklar.Sum(s => s.Miktar * s.BirimMaliyet);
+    var kritik = depo.Stoklar.Count(s => s.Miktar <= s.MinEsik && s.MinEsik > 0);
+    <div class="card mb-3">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <div>
+                <span class="fw-semibold">@depo.Ad</span>
+                @if (depo.MerkezDepoMu) { <span class="badge bg-primary ms-2">Merkez Depo</span> }
+                <span class="text-muted small ms-2">@(kurumlar.TryGetValue(depo.KurumId, out var kAd) ? kAd : "")</span>
+            </div>
+            <div class="d-flex gap-3 align-items-center">
+                <span class="text-muted small">@toplam.ToString("N0") adet · @deger.ToString("C0",tr)</span>
+                @if (kritik > 0) { <span class="badge bg-danger">@kritik kritik stok</span> }
+                <a href="/depo/Home/Detay/@depo.Id" class="btn btn-sm btn-outline-primary">Detay</a>
+            </div>
+        </div>
+        @if (depo.Stoklar.Any())
+        {
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Taşınır</th>
+                                <th class="text-center">Mevcut</th>
+                                <th class="text-center">Min. Eşik</th>
+                                <th class="text-end">Birim Maliyet</th>
+                                <th class="text-end">Toplam Değer</th>
+                                <th class="text-center">Durum</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var s in depo.Stoklar.OrderBy(x => x.Miktar <= x.MinEsik ? 0 : 1))
+                            {
+                                var isKritik = s.Miktar <= s.MinEsik && s.MinEsik > 0;
+                                <tr class="@(isKritik ? "table-danger" : "")">
+                                    <td>@(tanimlar.TryGetValue(s.TasinirTanimId, out var tAd) ? tAd : s.TasinirTanimId)</td>
+                                    <td class="text-center fw-semibold">@s.Miktar</td>
+                                    <td class="text-center text-muted">@s.MinEsik</td>
+                                    <td class="text-end text-muted small">@s.BirimMaliyet.ToString("C0",tr)</td>
+                                    <td class="text-end">@((s.Miktar * s.BirimMaliyet).ToString("C0",tr))</td>
+                                    <td class="text-center">
+                                        @if (isKritik)
+                                        { <span class="badge bg-danger">Kritik</span> }
+                                        else if (s.Miktar <= s.MinEsik * 2)
+                                        { <span class="badge bg-warning text-dark">Az</span> }
+                                        else
+                                        { <span class="badge bg-success">Normal</span> }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card-body text-muted text-center py-3 small">Bu depoda stok kaydı yok.</div>
+        }
+    </div>
+}

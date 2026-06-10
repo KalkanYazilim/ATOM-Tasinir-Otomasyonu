@@ -1,0 +1,167 @@
+@model IhtiyacTalebi
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@using System.Security.Claims
+@{
+    ViewData["Title"] = $"Talep – {Model.TalepNo}";
+    var tanimlar = ViewBag.Tanimlar as Dictionary<string, string> ?? new();
+    var kurumlar = ViewBag.Kurumlar as Dictionary<string, string> ?? new();
+    var rol = User.FindFirstValue(ClaimTypes.Role) ?? "";
+    var kullaniciId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/talep">Talepler</a></li>
+        <li class="breadcrumb-item active">@Model.TalepNo</li>
+    </ol>
+}
+
+<div class="row g-3">
+    <!-- Sol: Detay -->
+    <div class="col-lg-8">
+        <div class="card mb-3">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-clipboard2-check me-2 text-primary"></i>@Model.TalepNo</span>
+                @{
+                    var (bg, lbl) = Model.Durum switch {
+                        TalepDurumu.Taslak => ("secondary","Taslak"),
+                        TalepDurumu.GonderildiIlOnay => ("warning","İl Onayı Bekleniyor"),
+                        TalepDurumu.IlOnaylandi => ("info","İl Onayladı"),
+                        TalepDurumu.BakanlikAlindi => ("primary","Bakanlıkta"),
+                        TalepDurumu.BakanlikInceliyor => ("primary","İncelemede"),
+                        TalepDurumu.KarsilandiKismi => ("success","Kısmen Karşılandı"),
+                        TalepDurumu.KarsilandiTamamen => ("success","Tamamen Karşılandı"),
+                        TalepDurumu.Reddedildi => ("danger","Reddedildi"),
+                        _ => ("secondary",Model.Durum.ToString())
+                    };
+                }
+                <span class="badge bg-@bg fs-6">@lbl</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="text-muted small">Talep Eden Kurum</label>
+                        <div class="fw-semibold">@(kurumlar.TryGetValue(Model.TalepciKurumId, out var km) ? km : Model.TalepciKurumId)</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="text-muted small">Tarih</label>
+                        <div>@Model.TalepTarihi.ToString("dd.MM.yyyy")</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="text-muted small">Öncelik</label>
+                        <div><span class="badge bg-warning text-dark">@Model.OncelikSeviyesi</span></div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="text-muted small">Gerekçe</label>
+                    <div class="p-2 bg-light rounded">@Model.GerekceAciklama</div>
+                </div>
+                @if (!string.IsNullOrEmpty(Model.RedGerekce))
+                {
+                    <div class="alert alert-danger py-2"><strong>Red Gerekçesi:</strong> @Model.RedGerekce</div>
+                }
+
+                <h6 class="fw-semibold mt-3">Kalemler</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered mb-0">
+                        <thead class="table-light">
+                            <tr><th>Taşınır</th><th class="text-center">Talep</th><th class="text-center">Karşılanan</th><th>Açıklama</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var k in Model.Kalemler)
+                            {
+                                <tr>
+                                    <td>@(tanimlar.TryGetValue(k.TasinirTanimId, out var ad) ? ad : k.TasinirTanimId)</td>
+                                    <td class="text-center fw-semibold">@k.TalepMiktari</td>
+                                    <td class="text-center">@(k.KarsilananMiktar.HasValue ? k.KarsilananMiktar.Value.ToString() : "–")</td>
+                                    <td class="text-muted small">@k.Aciklama</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Onay Geçmişi -->
+        @if (Model.OnayGecmisi.Any())
+        {
+            <div class="card">
+                <div class="card-header bg-white fw-semibold">
+                    <i class="bi bi-clock-history me-2 text-primary"></i>Onay Geçmişi
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        @foreach (var o in Model.OnayGecmisi.OrderByDescending(x => x.Tarih))
+                        {
+                            <div class="list-group-item py-2">
+                                <div class="d-flex justify-content-between">
+                                    <span class="fw-semibold small">@o.KullaniciAdi <span class="text-muted fw-normal">· @o.Rol</span></span>
+                                    <div>
+                                        <span class="badge @(o.Karar == OnayDurumu.Onaylandi ? "bg-success" : "bg-danger")">@o.Karar</span>
+                                        <span class="text-muted small ms-2">@o.Tarih.ToString("dd.MM.yyyy HH:mm")</span>
+                                    </div>
+                                </div>
+                                <div class="text-muted small">@o.Asama @(!string.IsNullOrEmpty(o.Aciklama) ? $"· {o.Aciklama}" : "")</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Sağ: Aksiyonlar -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header bg-white fw-semibold">Aksiyonlar</div>
+            <div class="card-body d-grid gap-2">
+
+                @if (Model.Durum == TalepDurumu.Taslak && (Model.TalepciKullaniciId == kullaniciId || AtomRoller.BakanlikRolleri.Contains(rol)))
+                {
+                    <form method="post" action="/talep/Home/Gonder">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@Model.Id"/>
+                        <button class="btn btn-primary w-100"><i class="bi bi-send me-2"></i>Onaya Gönder</button>
+                    </form>
+                }
+
+                @if (Model.Durum == TalepDurumu.GonderildiIlOnay && rol == AtomRoller.IlMuduru)
+                {
+                    <form method="post" action="/talep/Home/IlOnayla">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@Model.Id"/>
+                        <input type="text" name="aciklama" class="form-control form-control-sm mb-2" placeholder="Açıklama (opsiyonel)"/>
+                        <button class="btn btn-success w-100"><i class="bi bi-check-lg me-2"></i>İl Müdürü Onayı</button>
+                    </form>
+                }
+
+                @if ((Model.Durum == TalepDurumu.IlOnaylandi || Model.Durum == TalepDurumu.BakanlikAlindi)
+                     && (rol == AtomRoller.BakanlikMerkez || rol == AtomRoller.SistemAdmin))
+                {
+                    <form method="post" action="/talep/Home/BakanlikOnayla">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@Model.Id"/>
+                        <textarea name="aciklama" class="form-control form-control-sm mb-2" placeholder="Değerlendirme notu..." rows="2"></textarea>
+                        <input type="hidden" name="onayla" value="true"/>
+                        <button class="btn btn-success w-100 mb-1"><i class="bi bi-check-circle me-2"></i>İncelemeye Al</button>
+                    </form>
+                    <form method="post" action="/talep/Home/BakanlikOnayla">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@Model.Id"/>
+                        <textarea name="aciklama" class="form-control form-control-sm mb-2" placeholder="Red gerekçesi..." rows="2" required></textarea>
+                        <input type="hidden" name="onayla" value="false"/>
+                        <button class="btn btn-outline-danger w-100"><i class="bi bi-x-circle me-2"></i>Reddet</button>
+                    </form>
+                }
+
+                @if (!string.IsNullOrEmpty(Model.BaglantiliIhaleId))
+                {
+                    <a href="/ihale/Home/Detay/@Model.BaglantiliIhaleId" class="btn btn-outline-info">
+                        <i class="bi bi-hammer me-2"></i>Bağlı İhale
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+</div>

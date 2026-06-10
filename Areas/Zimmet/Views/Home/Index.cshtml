@@ -1,0 +1,65 @@
+@model List<Zimmet>
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@using System.Security.Claims
+@{
+    ViewData["Title"] = "Zimmet";
+    var kullanicilar = ViewBag.Kullanicilar as Dictionary<string, string> ?? new();
+    var depolar = ViewBag.Depolar as Dictionary<string, string> ?? new();
+    var tanimlar = ViewBag.Tanimlar as Dictionary<string, string> ?? new();
+    var rol = User.FindFirstValue(ClaimTypes.Role) ?? "";
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/">Panel</a></li>
+        <li class="breadcrumb-item active">Zimmet</li>
+    </ol>
+}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-person-badge me-2 text-primary"></i>Zimmet Listesi</h5>
+    @if (rol != AtomRoller.Personel && rol != AtomRoller.Tedarikci)
+    {
+        <a href="/zimmet/Home/Yeni" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Yeni Zimmet</a>
+    }
+</div>
+
+<div class="row g-2 mb-3">
+    <div class="col-md-4">
+        <form method="get" class="d-flex gap-2">
+            <input type="text" name="ara" class="form-control form-control-sm" placeholder="Zimmet No ara..." value="@ViewBag.Ara"/>
+            <button class="btn btn-sm btn-outline-primary">Ara</button>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr><th>Zimmet No</th><th>Personel</th><th>Depo</th><th class="text-center">Kalem</th><th>Durum</th><th>Tarih</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Any())
+                    { <tr><td colspan="7" class="text-center text-muted py-4">Zimmet kaydı bulunamadı.</td></tr> }
+                    @foreach (var z in Model)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@z.ZimmetNo</td>
+                            <td>@(kullanicilar.TryGetValue(z.PersonelId, out var pAd) ? pAd : z.PersonelId)</td>
+                            <td class="small">@(depolar.TryGetValue(z.DepoId, out var dAd) ? dAd : z.DepoId)</td>
+                            <td class="text-center">@z.Kalemler.Count</td>
+                            <td>
+                                <span class="badge bg-@(z.Durum==ZimmetDurumu.Aktif?"success":z.Durum==ZimmetDurumu.Iade?"secondary":z.Durum==ZimmetDurumu.Kayip?"danger":"warning")">
+                                    @z.Durum
+                                </span>
+                            </td>
+                            <td class="text-muted small">@z.ZimmetTarihi.ToString("dd.MM.yyyy")</td>
+                            <td><a href="/zimmet/Home/Detay/@z.Id" class="btn btn-sm btn-outline-secondary">Detay</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

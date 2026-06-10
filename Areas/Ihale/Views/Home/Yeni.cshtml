@@ -1,0 +1,105 @@
+@model Ihale
+@using ATOM.Models.Domain
+@{
+    ViewData["Title"] = "Yeni İhale";
+    var tanimlar = ViewBag.Tanimlar as List<TasinirTanim> ?? new();
+    var bekleyenTalepler = ViewBag.BekleyenTalepler as List<IhtiyacTalebi> ?? new();
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/ihale">İhaleler</a></li>
+        <li class="breadcrumb-item active">Yeni İhale</li>
+    </ol>
+}
+<div class="row justify-content-center">
+<div class="col-lg-10">
+<div class="card">
+    <div class="card-header bg-white fw-semibold">
+        <i class="bi bi-hammer me-2 text-primary"></i>Yeni İhale Oluştur
+    </div>
+    <div class="card-body">
+        <form method="post">
+            @Html.AntiForgeryToken()
+            <div class="row g-3 mb-3">
+                <div class="col-md-8">
+                    <label class="form-label fw-semibold">İhale Başlığı <span class="text-danger">*</span></label>
+                    <input type="text" name="Baslik" class="form-control" required placeholder="Örn: 2026 Yılı Yazıcı Alımı"/>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Tahmini Bütçe (₺)</label>
+                    <input type="number" name="TahminiButce" class="form-control" min="0" step="0.01"/>
+                </div>
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Teknik Şartname</label>
+                    <textarea name="TeknikSartname" class="form-control" rows="4" placeholder="Teknik özellikler ve şartlar..."></textarea>
+                </div>
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Açıklama</label>
+                    <textarea name="Aciklama" class="form-control" rows="2"></textarea>
+                </div>
+            </div>
+
+            @if (bekleyenTalepler.Any())
+            {
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Kaynaklanan Talepler (opsiyonel)</label>
+                    <div class="border rounded p-2" style="max-height:150px;overflow-y:auto;">
+                        @foreach (var t in bekleyenTalepler)
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="kaynakTalepIds[]" value="@t.Id"/>
+                                <label class="form-check-label small">@t.TalepNo – @t.GerekceAciklama.Substring(0,Math.Min(60,t.GerekceAciklama.Length))...</label>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <h6 class="fw-semibold mb-2 mt-3">İhale Kalemleri</h6>
+            <div id="ihale-kalemler">
+                <div class="row g-2 mb-2 kalem-satir">
+                    <div class="col-md-5">
+                        <select name="tasinirIds[]" class="form-select form-select-sm" required>
+                            <option value="">– Taşınır Seçin –</option>
+                            @foreach (var t in tanimlar)
+                            { <option value="@t.Id">[@t.Kod] @t.Ad</option> }
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" name="miktarlar[]" class="form-control form-control-sm" placeholder="Miktar" min="1" required/>
+                    </div>
+                    <div class="col-md-4">
+                        <input type="text" name="teknikOzellikler[]" class="form-control form-control-sm" placeholder="Teknik özellik..."/>
+                    </div>
+                    <div class="col-md-1">
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.kalem-satir').remove()" disabled>
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="kalemEkle()">
+                <i class="bi bi-plus-lg me-1"></i>Kalem Ekle
+            </button>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>İhale Oluştur</button>
+                <a href="/ihale" class="btn btn-outline-secondary">İptal</a>
+            </div>
+        </form>
+    </div>
+</div>
+</div>
+</div>
+@section Scripts {
+<script>
+function kalemEkle() {
+    const div = document.getElementById('ihale-kalemler');
+    const ilk = div.querySelector('.kalem-satir');
+    const yeni = ilk.cloneNode(true);
+    yeni.querySelectorAll('input,select').forEach(i => i.value = '');
+    yeni.querySelector('button').disabled = false;
+    div.appendChild(yeni);
+}
+</script>
+}

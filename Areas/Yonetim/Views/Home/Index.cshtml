@@ -1,0 +1,48 @@
+@{
+    ViewData["Title"] = "Sistem Yönetimi";
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/">Panel</a></li>
+        <li class="breadcrumb-item active">Sistem Yönetimi</li>
+    </ol>
+}
+<h5 class="mb-4 fw-bold"><i class="bi bi-gear me-2 text-primary"></i>Sistem Yönetimi</h5>
+<div class="row g-3">
+    <div class="col-md-3">
+        <a href="/yonetim/Home/Kullanicilar" class="card text-decoration-none text-dark">
+            <div class="card-body text-center py-4">
+                <i class="bi bi-people fs-1 text-primary"></i>
+                <div class="fs-3 fw-bold mt-2">@ViewBag.KullaniciSayisi</div>
+                <div class="text-muted">Kullanıcı</div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="/yonetim/Home/Kurumlar" class="card text-decoration-none text-dark">
+            <div class="card-body text-center py-4">
+                <i class="bi bi-bank fs-1 text-success"></i>
+                <div class="fs-3 fw-bold mt-2">@ViewBag.KurumSayisi</div>
+                <div class="text-muted">Kurum</div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="/yonetim/Home/Firmalar" class="card text-decoration-none text-dark">
+            <div class="card-body text-center py-4">
+                <i class="bi bi-briefcase fs-1 text-warning"></i>
+                <div class="fs-3 fw-bold mt-2">@ViewBag.FirmaSayisi</div>
+                <div class="text-muted">Tedarikçi Firma</div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="/yonetim/Home/TasinirTanimlar" class="card text-decoration-none text-dark">
+            <div class="card-body text-center py-4">
+                <i class="bi bi-tags fs-1 text-info"></i>
+                <div class="fs-3 fw-bold mt-2">@ViewBag.TanimSayisi</div>
+                <div class="text-muted">Taşınır Tanımı</div>
+            </div>
+        </a>
+    </div>
+</div>

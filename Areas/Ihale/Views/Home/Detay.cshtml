@@ -1,0 +1,240 @@
+@model Ihale
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@using System.Security.Claims
+@{
+    ViewData["Title"] = $"İhale – {Model.IhaleNo}";
+    var tanimlar = ViewBag.Tanimlar as Dictionary<string, dynamic> ?? new();
+    var firmalar = ViewBag.Firmalar as Dictionary<string, string> ?? new();
+    var firmaId = ViewBag.FirmaId as string;
+    var rol = User.FindFirstValue(ClaimTypes.Role) ?? "";
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/ihale">İhaleler</a></li>
+        <li class="breadcrumb-item active">@Model.IhaleNo</li>
+    </ol>
+}
+
+<div class="row g-3">
+<div class="col-lg-8">
+    <div class="card mb-3">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <span class="fw-semibold"><i class="bi bi-hammer me-2 text-primary"></i>@Model.IhaleNo – @Model.Baslik</span>
+            @{
+                var (bg, lbl) = Model.Durum switch {
+                    IhaleDurumu.Hazirlaniyor => ("secondary","Hazırlanıyor"),
+                    IhaleDurumu.IlanEdildi => ("info","İlan Edildi"),
+                    IhaleDurumu.TeklifAliniyor => ("warning","Teklif Alınıyor"),
+                    IhaleDurumu.Sonuclandi => ("success","Sonuçlandı"),
+                    IhaleDurumu.KapandiTamamlandi => ("success","Tamamlandı"),
+                    IhaleDurumu.Iptal => ("danger","İptal"),
+                    _ => ("secondary",Model.Durum.ToString())
+                };
+            }
+            <span class="badge bg-@bg fs-6">@lbl</span>
+        </div>
+        <div class="card-body">
+            <div class="row g-2 mb-3">
+                <div class="col-md-4">
+                    <label class="text-muted small">Tahmini Bütçe</label>
+                    <div class="fw-semibold">@Model.TahminiButce.ToString("C0", tr)</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="text-muted small">Oluşturma Tarihi</label>
+                    <div>@Model.OlusturmaTarihi.ToString("dd.MM.yyyy")</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="text-muted small">Teklif Son Tarih</label>
+                    <div>@(Model.TeklifSonTarihi.HasValue ? Model.TeklifSonTarihi.Value.ToString("dd.MM.yyyy") : "–")</div>
+                </div>
+            </div>
+            @if (!string.IsNullOrEmpty(Model.TeknikSartname))
+            {
+                <div class="mb-3">
+                    <label class="text-muted small">Teknik Şartname</label>
+                    <div class="p-2 bg-light rounded small">@Model.TeknikSartname</div>
+                </div>
+            }
+
+            <h6 class="fw-semibold">İhale Kalemleri</h6>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0">
+                    <thead class="table-light">
+                        <tr><th>Taşınır</th><th class="text-center">Miktar</th><th>Teknik Özellik</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var k in Model.Kalemler)
+                        {
+                            <tr>
+                                <td>@(tanimlar.TryGetValue(k.TasinirTanimId, out var t) ? (string)t.Ad : k.TasinirTanimId)</td>
+                                <td class="text-center">@k.Miktar</td>
+                                <td class="text-muted small">@k.TeknikOzellik</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Teklifler -->
+    @if (Model.Teklifler.Any() && rol != AtomRoller.Tedarikci)
+    {
+        <div class="card mb-3">
+            <div class="card-header bg-white fw-semibold">
+                <i class="bi bi-list-check me-2 text-primary"></i>Gelen Teklifler (@Model.Teklifler.Count)
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr><th>Firma</th><th>Tarih</th><th class="text-end">Toplam Tutar</th><th>Durum</th>
+                                @if (Model.Durum == IhaleDurumu.TeklifAliniyor || Model.Durum == IhaleDurumu.DegerlendiriliYor)
+                                { <th>Kazan</th> }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var tk in Model.Teklifler.OrderBy(t => t.ToplamTutar))
+                            {
+                                var isWinner = tk.Id == Model.KazananTeklifId;
+                                <tr class="@(isWinner ? "table-success" : "")">
+                                    <td>@(firmalar.TryGetValue(tk.FirmaId, out var fn) ? fn : tk.FirmaId) @(isWinner ? "🏆" : "")</td>
+                                    <td class="small">@tk.VerilmeTarihi.ToString("dd.MM.yyyy")</td>
+                                    <td class="text-end fw-semibold">@tk.ToplamTutar.ToString("C0", tr)</td>
+                                    <td><span class="badge bg-@(tk.Durum==TeklifDurumu.Kabul?"success":tk.Durum==TeklifDurumu.Red?"danger":"secondary")">@tk.Durum</span></td>
+                                    @if (Model.Durum == IhaleDurumu.TeklifAliniyor || Model.Durum == IhaleDurumu.DegerlendiriliYor)
+                                    {
+                                        if (rol == AtomRoller.BakanlikSatinAlma || rol == AtomRoller.SistemAdmin)
+                                        {
+                                            <td>
+                                                <form method="post" action="/ihale/Home/Sonuclandir">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@Model.Id"/>
+                                                    <input type="hidden" name="kazananTeklifId" value="@tk.Id"/>
+                                                    <input type="hidden" name="degerlendirmeNotu" value="En uygun teklif seçildi."/>
+                                                    <button class="btn btn-sm btn-success"><i class="bi bi-trophy"></i> Seç</button>
+                                                </form>
+                                            </td>
+                                        }
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Aksiyonlar -->
+<div class="col-lg-4">
+    <div class="card">
+        <div class="card-header bg-white fw-semibold">Aksiyonlar</div>
+        <div class="card-body d-grid gap-2">
+            @if (rol == AtomRoller.BakanlikSatinAlma || rol == AtomRoller.SistemAdmin)
+            {
+                @if (Model.Durum == IhaleDurumu.Hazirlaniyor)
+                {
+                    <form method="post" action="/ihale/Home/Ilan">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@Model.Id"/>
+                        <button class="btn btn-info w-100"><i class="bi bi-megaphone me-2"></i>İlan Et</button>
+                    </form>
+                }
+                @if (Model.Durum == IhaleDurumu.IlanEdildi)
+                {
+                    <form method="post" action="/ihale/Home/TeklifAc">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@Model.Id"/>
+                        <input type="date" name="sonTarih" class="form-control form-control-sm mb-2" required/>
+                        <button class="btn btn-warning w-100"><i class="bi bi-clock me-2"></i>Teklif Almaya Aç</button>
+                    </form>
+                }
+                @if (Model.Durum == IhaleDurumu.Sonuclandi)
+                {
+                    <a href="/depo/Home/YeniMalKabul?ihaleId=@Model.Id" class="btn btn-success">
+                        <i class="bi bi-box-arrow-in-down me-2"></i>Mal Kabulü Başlat
+                    </a>
+                }
+            }
+            @if (rol == AtomRoller.Tedarikci && Model.Durum == IhaleDurumu.TeklifAliniyor)
+            {
+                var mevcutTeklif = Model.Teklifler.FirstOrDefault(t => t.FirmaId == firmaId);
+                if (mevcutTeklif == null)
+                {
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#teklifModal">
+                        <i class="bi bi-send me-2"></i>Teklif Ver
+                    </button>
+                }
+                else
+                {
+                    <div class="alert alert-success py-2 mb-0 small">Teklifiniz iletildi: @mevcutTeklif.ToplamTutar.ToString("C0",tr)</div>
+                }
+            }
+        </div>
+    </div>
+</div>
+</div>
+
+@if (rol == AtomRoller.Tedarikci && Model.Durum == IhaleDurumu.TeklifAliniyor)
+{
+    <div class="modal fade" id="teklifModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Teklif Ver – @Model.IhaleNo</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post" action="/ihale/Home/TeklifVer">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@Model.Id"/>
+                    <div class="modal-body">
+                        @foreach (var k in Model.Kalemler)
+                        {
+                            var tasinirAdi = tanimlar.TryGetValue(k.TasinirTanimId, out var td) ? (string)td.Ad : k.TasinirTanimId;
+                            <div class="border rounded p-2 mb-2">
+                                <div class="fw-semibold small mb-1">@tasinirAdi – @k.Miktar adet</div>
+                                <div class="row g-2">
+                                    <input type="hidden" name="tasinirIds[]" value="@k.TasinirTanimId"/>
+                                    <input type="hidden" name="miktarlar[]" value="@k.Miktar"/>
+                                    <div class="col-md-3">
+                                        <input type="number" name="birimFiyatlar[]" class="form-control form-control-sm" placeholder="Birim fiyat (₺)" step="0.01" required oninput="toplamHesapla()"/>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <input type="text" name="markalar[]" class="form-control form-control-sm" placeholder="Marka"/>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <input type="text" name="modeller[]" class="form-control form-control-sm" placeholder="Model"/>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">Toplam Tutar (₺)</label>
+                            <input type="number" name="toplamTutar" id="toplamTutar" class="form-control" step="0.01" required/>
+                        </div>
+                        <div>
+                            <label class="form-label small fw-semibold">Açıklama / Notlar</label>
+                            <textarea name="aciklama" class="form-control form-control-sm" rows="2"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                        <button type="submit" class="btn btn-primary">Teklifi Gönder</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+    function toplamHesapla() {
+        const fiyatlar = Array.from(document.querySelectorAll('[name="birimFiyatlar[]"]')).map(i => parseFloat(i.value)||0);
+        const miktarlar = Array.from(document.querySelectorAll('[name="miktarlar[]"]')).map(i => parseFloat(i.value)||0);
+        const toplam = fiyatlar.reduce((s, f, i) => s + f * miktarlar[i], 0);
+        document.getElementById('toplamTutar').value = toplam.toFixed(2);
+    }
+    </script>
+}
