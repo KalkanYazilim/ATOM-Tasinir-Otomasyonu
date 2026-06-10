@@ -12,7 +12,12 @@ namespace ATOM.Areas.Kayit.Controllers;
 public class HomeController : Controller
 {
     private readonly IAtomDataService _svc;
-    public HomeController(IAtomDataService svc) => _svc = svc;
+    private readonly IDosyaService _dosya;
+    private readonly BelgeService _belge;
+    public HomeController(IAtomDataService svc, IDosyaService dosya, BelgeService belge)
+    {
+        _svc = svc; _dosya = dosya; _belge = belge;
+    }
 
     private string KullaniciId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
     private string KullaniciAdSoyad => User.FindFirstValue("AdSoyad") ?? User.Identity?.Name ?? "";
@@ -111,10 +116,24 @@ public class HomeController : Controller
     [HttpPost]
     [Authorize(Roles = $"{AtomRoller.MerkezDepoSorumlusu},{AtomRoller.IlDepoSorumlusu},{AtomRoller.SistemAdmin},{AtomRoller.BakanlikMerkez}")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Duzenle(TasinirKayit model)
+    public async Task<IActionResult> Duzenle(TasinirKayit model, IFormFile? resim)
     {
         var mevcut = await _svc.TasinirKayitGetirAsync(model.Id);
         var yeniMi = mevcut == null;
+
+        // Resim yükleme
+        var resimUrl = await _dosya.ResimKaydetAsync(resim, "tasinir");
+        if (resimUrl != null)
+        {
+            model.ResimUrl = resimUrl;
+            model.Resimler ??= new();
+            model.Resimler.Add(resimUrl);
+        }
+        else if (!yeniMi)
+        {
+            model.ResimUrl = mevcut!.ResimUrl;
+            model.Resimler = mevcut.Resimler;
+        }
 
         model.GuncellemeTarihi = DateTime.UtcNow;
         if (yeniMi)
@@ -149,6 +168,55 @@ public class HomeController : Controller
         await _svc.TasinirKayitKaydetAsync(model);
         TempData["Basari"] = yeniMi ? "Taşınır kaydı oluşturuldu." : "Taşınır kaydı güncellendi.";
         return RedirectToAction(nameof(Detay), new { id = model.Id });
+    }
+
+    // ─── Etiket (barkod + QR yazdırılabilir) ──────────────────
+    public async Task<IActionResult> Etiket(string id)
+    {
+        var kayit = await _svc.TasinirKayitGetirAsync(id);
+        if (kayit == null) return NotFound();
+        if (!AtomRoller.BakanlikRolleri.Contains(Rol) && kayit.KurumId != KurumId) return Forbid();
+        return View(kayit);
+    }
+
+    // ─── Excel Export ─────────────────────────────────────────
+    public async Task<IActionResult> ExcelExport()
+    {
+        var kayitlar = await _svc.TasinirKayitlariGetirAsync();
+        if (!AtomRoller.BakanlikRolleri.Contains(Rol))
+            kayitlar = kayitlar.Where(k => k.KurumId == KurumId).ToList();
+
+        var basliklar = new List<string> { "Barkod", "Sicil No", "Seri No", "Cinsi", "Marka", "Model",
+            "Birim Fiyat", "Ambar", "Harcama Birimi", "İl", "Fiş No", "Durum", "Giriş Tarihi", "Verildiği Yer", "TC No" };
+        var satirlar = kayitlar.Select(k => (IList<object?>)new List<object?>
+        {
+            k.BarKod, k.SicilNo, k.SeriNo, k.Cinsi, k.MarkaAdi, k.Modeli, k.BirimFiyat, k.AmbarAdi,
+            k.HarBirimiAdi, k.IlAdi, k.FisNo, k.Durum.ToString(),
+            k.KurumGirisTarihi?.ToString("dd.MM.yyyy"), k.VerildigiYerBirim,
+            KvkkHelper.MaskeleTc(k.TcNumarasi, User)
+        });
+        var bytes = _belge.ExcelTablo("Taşınır Envanteri", basliklar, satirlar);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"envanter-{DateTime.Now:yyyyMMdd}.xlsx");
+    }
+
+    // ─── PDF Export ───────────────────────────────────────────
+    public async Task<IActionResult> PdfExport()
+    {
+        var kayitlar = await _svc.TasinirKayitlariGetirAsync();
+        if (!AtomRoller.BakanlikRolleri.Contains(Rol))
+            kayitlar = kayitlar.Where(k => k.KurumId == KurumId).ToList();
+
+        var basliklar = new List<string> { "Barkod", "Sicil No", "Cinsi", "Marka/Model", "Birim Fiyat", "Ambar", "Durum" };
+        var satirlar = kayitlar.Take(500).Select(k => (IList<string>)new List<string>
+        {
+            k.BarKod, k.SicilNo, k.Cinsi, $"{k.MarkaAdi} {k.Modeli}",
+            k.BirimFiyat.ToString("N2"), k.AmbarAdi, k.Durum.ToString()
+        });
+        var bytes = _belge.PdfTablo("TAŞINIR ENVANTER LİSTESİ",
+            $"Kayıt Sayısı: {kayitlar.Count} · Tarih: {DateTime.Now:dd.MM.yyyy}",
+            basliklar, satirlar,
+            "Dayanak: Taşınır Mal Yönetmeliği (5018 sayılı Kanun) – Dayanıklı Taşınır Listesi", yatay: true);
+        return File(bytes, "application/pdf", $"envanter-{DateTime.Now:yyyyMMdd}.pdf");
     }
 
     // ─── CSV İçe Aktarma (TKYS uyumlu) ────────────────────────

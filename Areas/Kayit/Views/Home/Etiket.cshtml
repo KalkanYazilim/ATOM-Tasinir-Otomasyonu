@@ -1,0 +1,39 @@
+@model ATOM.Models.Domain.TasinirKayit
+@{ Layout = null; }
+<!DOCTYPE html>
+<html lang="tr"><head><meta charset="utf-8"/><title>Etiket – @Model.SicilNo</title>
+<style>
+    body { font-family:'Segoe UI',sans-serif; margin:0; padding:20px; }
+    .etiket { width:340px; border:2px solid #1a3a6b; border-radius:8px; padding:14px; margin:auto; text-align:center; }
+    .etiket .kurum { font-size:11px; color:#555; }
+    .etiket .cinsi { font-size:15px; font-weight:700; color:#1a3a6b; margin:4px 0; }
+    .etiket .alt { display:flex; justify-content:space-around; align-items:center; margin-top:10px; }
+    .etiket .bilgi { font-size:11px; text-align:left; }
+    .yazdir-btn { display:block; margin:12px auto; padding:8px 22px; }
+    @@media print { .yazdir-btn { display:none; } body { padding:0; } }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+<button class="yazdir-btn" onclick="window.print()">🖨 Etiketi Yazdır</button>
+<div class="etiket">
+    <div class="kurum">@Model.AmbarAdi · @Model.IlAdi</div>
+    <div class="cinsi">@Model.Cinsi</div>
+    <div style="font-size:12px;color:#333;">@Model.MarkaAdi @Model.Modeli</div>
+    <svg id="bc" style="margin-top:8px;"></svg>
+    <div class="alt">
+        <div id="qr"></div>
+        <div class="bilgi">
+            <div><strong>Sicil:</strong> @Model.SicilNo</div>
+            <div><strong>Barkod:</strong> @Model.BarKod</div>
+            <div><strong>Seri:</strong> @Model.SeriNo</div>
+            <div><strong>Fiyat:</strong> @Model.BirimFiyat.ToString("N2") ₺</div>
+        </div>
+    </div>
+</div>
+<script>
+    try { JsBarcode("#bc", "@Model.BarKod", {format:'CODE128', height:45, fontSize:13, margin:2}); } catch(e){}
+    new QRCode(document.getElementById('qr'), { text: "SICIL:@Model.SicilNo|BK:@Model.BarKod|SERI:@Model.SeriNo", width:80, height:80 });
+</script>
+</body></html>

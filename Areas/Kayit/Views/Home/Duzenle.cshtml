@@ -14,7 +14,7 @@
     </ol>
 }
 
-<form method="post" action="/kayit/Home/Duzenle">
+<form method="post" action="/kayit/Home/Duzenle" enctype="multipart/form-data">
     @Html.AntiForgeryToken()
     <input type="hidden" name="Id" value="@Model.Id"/>
     <input type="hidden" name="KurumId" value="@Model.KurumId"/>
@@ -52,6 +52,16 @@
                 </div>
                 <div class="col-12"><label class="form-label small fw-semibold">Açıklama</label><textarea name="Aciklama" class="form-control form-control-sm" rows="2">@Model.Aciklama</textarea></div>
                 <div class="col-12"><label class="form-label small fw-semibold">Ek Özellik</label><textarea name="EkOzellik" class="form-control form-control-sm" rows="2">@Model.EkOzellik</textarea></div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold">Taşınır Fotoğrafı</label>
+                    <input type="file" name="resim" accept="image/*" class="form-control form-control-sm"/>
+                    <div class="form-text">JPG/PNG, max 5 MB.</div>
+                </div>
+                @if (!string.IsNullOrEmpty(Model.ResimUrl))
+                {
+                    <div class="col-md-6"><label class="form-label small fw-semibold">Mevcut Fotoğraf</label><br/>
+                        <img src="@Model.ResimUrl" class="img-thumbnail" style="max-height:90px;"/></div>
+                }
             </div>
         </div>
     </div>

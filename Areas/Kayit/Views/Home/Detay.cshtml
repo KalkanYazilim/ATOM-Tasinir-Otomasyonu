@@ -24,10 +24,13 @@
         <i class="bi bi-upc-scan me-2 text-primary"></i>@Model.Cinsi
         <span class="text-muted fw-normal fs-6">· Sicil: @Model.SicilNo</span>
     </h5>
-    @if (yetkili)
-    {
-        <a href="/kayit/Home/Duzenle/@Model.Id" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil me-1"></i>Düzenle</a>
-    }
+    <div class="d-flex gap-2">
+        <a href="/kayit/Home/Etiket/@Model.Id" target="_blank" class="btn btn-outline-secondary btn-sm"><i class="bi bi-upc me-1"></i>Etiket Yazdır</a>
+        @if (yetkili)
+        {
+            <a href="/kayit/Home/Duzenle/@Model.Id" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil me-1"></i>Düzenle</a>
+        }
+    </div>
 </div>
 
 <div class="row g-3">
@@ -87,6 +90,30 @@
     </div>
 
     <div class="col-lg-4">
+        <!-- Barkod + QR -->
+        <div class="card mb-3">
+            <div class="card-header bg-white fw-semibold"><i class="bi bi-upc-scan me-2 text-primary"></i>Barkod / Karekod</div>
+            <div class="card-body text-center">
+                @if (!string.IsNullOrEmpty(Model.ResimUrl))
+                {
+                    <img src="@Model.ResimUrl" alt="Taşınır" class="img-fluid rounded mb-3" style="max-height:140px;"/>
+                }
+                @if (!string.IsNullOrEmpty(Model.BarKod))
+                {
+                    <svg class="atom-barcode d-block mx-auto" data-value="@Model.BarKod" data-height="50"></svg>
+                }
+                else { <div class="text-muted small">Barkod tanımlı değil.</div> }
+                <div class="d-flex justify-content-center align-items-center gap-3 mt-3">
+                    <div class="atom-qr" data-value="SICIL:@Model.SicilNo|BARKOD:@Model.BarKod|SERI:@Model.SeriNo" data-size="96"></div>
+                    <div class="text-start small text-muted">
+                        <div><strong>Sicil:</strong> @Model.SicilNo</div>
+                        <div><strong>Seri:</strong> @Model.SeriNo</div>
+                        <div class="text-muted" style="font-size:.7rem;">Karekod ile hızlı sorgu</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="card mb-3">
             <div class="card-header bg-white fw-semibold">Durum</div>
             <div class="card-body text-center">

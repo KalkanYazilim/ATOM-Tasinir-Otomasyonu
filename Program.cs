@@ -9,7 +9,12 @@ builder.Services.AddScoped<IBildirimService, BildirimService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IStokService, StokService>();
 builder.Services.AddScoped<ITasinirKayitService, TasinirKayitService>();
+builder.Services.AddScoped<IDosyaService, DosyaService>();
+builder.Services.AddSingleton<BelgeService>();
 builder.Services.AddHostedService<SeedDataHostedService>();
+
+// QuestPDF Community lisansı (yıllık geliri 1M USD altı kurumlar için ücretsiz)
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>

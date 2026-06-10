@@ -18,16 +18,22 @@
         <div class="table-responsive">
             <table class="table table-hover mb-0">
                 <thead class="table-light">
-                    <tr><th>Kod</th><th>Ad</th><th>Kategori</th><th>Birim</th><th>Durum</th><th></th></tr>
+                    <tr><th style="width:48px"></th><th>Kod</th><th>Ad</th><th>Kategori</th><th>Birim</th><th>Tür</th><th>Durum</th><th></th></tr>
                 </thead>
                 <tbody>
                     @foreach (var t in Model.OrderBy(x => x.Kod))
                     {
                         <tr>
+                            <td>
+                                @if (!string.IsNullOrEmpty(t.ResimUrl))
+                                { <img src="@t.ResimUrl" class="rounded" style="width:38px;height:38px;object-fit:cover;"/> }
+                                else { <span class="text-muted"><i class="bi bi-image"></i></span> }
+                            </td>
                             <td class="fw-semibold text-muted small">@t.Kod</td>
                             <td>@t.Ad</td>
                             <td><span class="badge bg-info text-dark">@t.Kategori</span></td>
                             <td>@t.Birim</td>
+                            <td>@(t.DemirbasMi ? "<span class='badge bg-secondary'>Demirbaş</span>" : "<span class='badge bg-light text-dark'>Sarf</span>")</td>
                             <td><span class="badge bg-@(t.AktifMi?"success":"danger")">@(t.AktifMi?"Aktif":"Pasif")</span></td>
                             <td><a href="/yonetim/Home/TasinirTanimDuzenle/@t.Id" class="btn btn-sm btn-outline-secondary">Düzenle</a></td>
                         </tr>

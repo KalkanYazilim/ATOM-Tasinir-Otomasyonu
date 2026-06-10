@@ -23,14 +23,23 @@
         }
         body { font-family: 'Segoe UI', sans-serif; background: #f4f6f9; }
         #sidebar {
-            width: var(--atom-sidebar-w); min-height: 100vh;
+            width: var(--atom-sidebar-w); height: 100vh;
             background: var(--atom-primary); position: fixed; left: 0; top: 0; z-index: 100;
-            transition: transform .25s ease; overflow-y: auto;
+            transition: transform .25s ease;
+            display: flex; flex-direction: column;
         }
         #sidebar .brand {
             padding: 1.2rem 1rem; background: rgba(0,0,0,.25);
             border-bottom: 1px solid rgba(255,255,255,.1);
+            flex-shrink: 0;
         }
+        #sidebar .menu-scroll {
+            flex: 1 1 auto; overflow-y: auto; overflow-x: hidden;
+            scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.3) transparent;
+        }
+        #sidebar .menu-scroll::-webkit-scrollbar { width: 7px; }
+        #sidebar .menu-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,.25); border-radius: 4px; }
+        #sidebar .menu-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.45); }
         #sidebar .logo-text { color: #fff; font-size: 1.5rem; font-weight: 700; letter-spacing: 3px; }
         #sidebar .sub-text { color: rgba(255,255,255,.55); font-size: .68rem; }
         #sidebar .nav-link {
@@ -76,7 +85,7 @@
             <div class="logo-text"><i class="bi bi-box-seam me-2"></i>ATOM</div>
             <div class="sub-text">Taşınır Malzeme Otomasyonu</div>
         </div>
-        <div class="mt-2 pb-4">
+        <div class="menu-scroll pb-4 pt-2">
             <div class="nav-section">Ana Menü</div>
             <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Dashboard" ? "active" : "")"
                href="@Url.Action("Index","Dashboard")">
@@ -172,6 +181,33 @@ else
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script>
+// Sayfadaki tüm barkod ve QR alanlarını otomatik çiz
+function atomKodlariCiz() {
+    document.querySelectorAll('svg.atom-barcode:not([data-done])').forEach(function(el){
+        try {
+            JsBarcode(el, el.getAttribute('data-value') || '', {
+                format: 'CODE128',
+                height: parseInt(el.getAttribute('data-height') || '38'),
+                width: parseFloat(el.getAttribute('data-bw') || '1.6'),
+                fontSize: parseInt(el.getAttribute('data-fs') || '12'),
+                margin: 4, displayValue: el.getAttribute('data-text') !== 'false'
+            });
+            el.setAttribute('data-done','1');
+        } catch(e) { /* gecersiz deger */ }
+    });
+    document.querySelectorAll('.atom-qr:not([data-done])').forEach(function(el){
+        var v = el.getAttribute('data-value') || '';
+        if (!v) return;
+        var s = parseInt(el.getAttribute('data-size') || '90');
+        new QRCode(el, { text: v, width: s, height: s, correctLevel: QRCode.CorrectLevel.M });
+        el.setAttribute('data-done','1');
+    });
+}
+document.addEventListener('DOMContentLoaded', atomKodlariCiz);
+</script>
 @RenderSection("Scripts", required: false)
 </body>
 </html>

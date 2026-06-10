@@ -12,7 +12,11 @@ namespace ATOM.Areas.Raporlama.Controllers;
 public class HomeController : Controller
 {
     private readonly IAtomDataService _svc;
-    public HomeController(IAtomDataService svc) => _svc = svc;
+    private readonly BelgeService _belge;
+    public HomeController(IAtomDataService svc, BelgeService belge)
+    {
+        _svc = svc; _belge = belge;
+    }
 
     private string Rol => User.FindFirstValue(ClaimTypes.Role)!;
     private string KurumId => User.FindFirstValue("KurumId")!;
@@ -36,6 +40,53 @@ public class HomeController : Controller
         var bom = new byte[] { 0xEF, 0xBB, 0xBF }; // Excel Türkçe uyumu
         var govde = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
         return File(bom.Concat(govde).ToArray(), "text/csv", dosyaAdi);
+    }
+
+    // ─── Stok Raporu Excel ────────────────────────────────────
+    public async Task<IActionResult> StokExcel()
+    {
+        var depolar = await _svc.DepolariGetirAsync();
+        var tanimlar = await _svc.TasinirTanimlariGetirAsync();
+        var kurumlar = await _svc.KurumlariGetirAsync();
+        if (!Bakanlik) depolar = depolar.Where(d => d.KurumId == KurumId).ToList();
+
+        var satirlar = new List<IList<object?>>();
+        foreach (var d in depolar)
+        {
+            var kurum = kurumlar.FirstOrDefault(k => k.Id == d.KurumId);
+            foreach (var s in d.Stoklar)
+            {
+                var t = tanimlar.FirstOrDefault(x => x.Id == s.TasinirTanimId);
+                satirlar.Add(new List<object?> { kurum?.Ad, d.Ad, t?.Kod, t?.Ad, t?.Kategori.ToString(),
+                    s.Miktar, t?.Birim, s.MinEsik, s.BirimMaliyet, s.Miktar * s.BirimMaliyet,
+                    (s.MinEsik > 0 && s.Miktar <= s.MinEsik) ? "KRİTİK" : "Normal" });
+            }
+        }
+        var bytes = _belge.ExcelTablo("Stok Raporu",
+            new List<string> { "Kurum", "Depo", "Hesap Kodu", "Taşınır", "Kategori", "Miktar", "Birim", "Min Eşik", "Birim Maliyet", "Toplam Değer", "Durum" },
+            satirlar);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"stok-raporu-{DateTime.Now:yyyyMMdd}.xlsx");
+    }
+
+    // ─── Stok Raporu PDF ──────────────────────────────────────
+    public async Task<IActionResult> StokPdf()
+    {
+        var depolar = await _svc.DepolariGetirAsync();
+        var tanimlar = await _svc.TasinirTanimlariGetirAsync();
+        if (!Bakanlik) depolar = depolar.Where(d => d.KurumId == KurumId).ToList();
+
+        var satirlar = new List<IList<string>>();
+        foreach (var d in depolar)
+            foreach (var s in d.Stoklar)
+            {
+                var t = tanimlar.FirstOrDefault(x => x.Id == s.TasinirTanimId);
+                satirlar.Add(new List<string> { d.Ad, t?.Ad ?? "", s.Miktar.ToString(), t?.Birim ?? "",
+                    s.BirimMaliyet.ToString("N2"), (s.Miktar * s.BirimMaliyet).ToString("N2") });
+            }
+        var bytes = _belge.PdfTablo("AMBAR STOK / SAYIM LİSTESİ", $"Tarih: {DateTime.Now:dd.MM.yyyy}",
+            new List<string> { "Depo", "Taşınır", "Miktar", "Birim", "Birim Maliyet", "Toplam Değer" },
+            satirlar, "Dayanak: Taşınır Mal Yönetmeliği – Ambar Stok / Taşınır İcmal Cetveli");
+        return File(bytes, "application/pdf", $"stok-raporu-{DateTime.Now:yyyyMMdd}.pdf");
     }
 
     // ─── Stok Raporu CSV ──────────────────────────────────────

@@ -66,6 +66,8 @@ public class TasinirTanim
     public bool DemirbasMi { get; set; }              // true = tekil sicil/barkod izlenir; false = sarf
     public int KritikEsik { get; set; }               // varsayılan kritik stok eşiği
     public bool AktifMi { get; set; } = true;
+    public string? ResimUrl { get; set; }             // ana görsel (wwwroot göreli)
+    public List<string> Resimler { get; set; } = new();
     public List<string> EtiketListesi { get; set; } = new();
 }
 
@@ -494,6 +496,8 @@ public class TasinirKayit
     public string? DepoId { get; set; }
     public string? KurumId { get; set; }
     public string? ZimmetId { get; set; }
+    public string? ResimUrl { get; set; }                 // tekil demirbaş fotoğrafı
+    public List<string> Resimler { get; set; } = new();
     public TasinirKayitDurumu Durum { get; set; } = TasinirKayitDurumu.Ambarda;
     public DateTime OlusturmaTarihi { get; set; } = DateTime.UtcNow;
     public DateTime GuncellemeTarihi { get; set; } = DateTime.UtcNow;

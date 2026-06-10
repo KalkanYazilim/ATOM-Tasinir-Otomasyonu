@@ -13,7 +13,11 @@ namespace ATOM.Areas.Yonetim.Controllers;
 public class HomeController : Controller
 {
     private readonly IAtomDataService _svc;
-    public HomeController(IAtomDataService svc) => _svc = svc;
+    private readonly IDosyaService _dosya;
+    public HomeController(IAtomDataService svc, IDosyaService dosya)
+    {
+        _svc = svc; _dosya = dosya;
+    }
 
     public async Task<IActionResult> Index()
     {
@@ -128,8 +132,20 @@ public class HomeController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> TasinirTanimDuzenle(TasinirTanim model)
+    public async Task<IActionResult> TasinirTanimDuzenle(TasinirTanim model, IFormFile? resim)
     {
+        var resimUrl = await _dosya.ResimKaydetAsync(resim, "urun");
+        if (resimUrl != null)
+        {
+            model.ResimUrl = resimUrl;
+            model.Resimler ??= new();
+            model.Resimler.Add(resimUrl);
+        }
+        else if (!string.IsNullOrEmpty(model.Id))
+        {
+            var mevcut = await _svc.TasinirTanimGetirAsync(model.Id);
+            if (mevcut != null) { model.ResimUrl = mevcut.ResimUrl; model.Resimler = mevcut.Resimler; }
+        }
         await _svc.TasinirTanimKaydetAsync(model);
         TempData["Basari"] = "Taşınır tanımı kaydedildi.";
         return RedirectToAction(nameof(TasinirTanimlar));
