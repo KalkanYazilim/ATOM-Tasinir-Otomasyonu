@@ -105,6 +105,16 @@ public class HomeController : Controller
         return RedirectToAction(nameof(Firmalar));
     }
 
+    public async Task<IActionResult> AuditLog(string? modul = null)
+    {
+        var loglar = await _svc.AuditLoglariGetirAsync();
+        if (!string.IsNullOrEmpty(modul))
+            loglar = loglar.Where(l => l.Modul == modul).ToList();
+        ViewBag.Moduller = (await _svc.AuditLoglariGetirAsync()).Select(l => l.Modul).Distinct().OrderBy(x => x).ToList();
+        ViewBag.Modul = modul;
+        return View(loglar.OrderByDescending(l => l.Tarih).Take(500).ToList());
+    }
+
     public async Task<IActionResult> TasinirTanimlar()
     {
         return View(await _svc.TasinirTanimlariGetirAsync());

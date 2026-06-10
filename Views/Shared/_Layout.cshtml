@@ -127,6 +127,7 @@
                 <a class="nav-link" href="/yonetim/Home/Kurumlar"><i class="bi bi-bank"></i> Kurumlar</a>
                 <a class="nav-link" href="/yonetim/Home/Firmalar"><i class="bi bi-briefcase"></i> Firmalar</a>
                 <a class="nav-link" href="/yonetim/Home/TasinirTanimlar"><i class="bi bi-tags"></i> Taşınır Tanımları</a>
+                <a class="nav-link" href="/yonetim/Home/AuditLog"><i class="bi bi-journal-text"></i> İşlem Kayıtları</a>
             }
         </div>
     </nav>
@@ -148,6 +149,7 @@
                 {
                     <span class="badge bg-danger fs-6 fw-normal"><i class="bi bi-exclamation-triangle me-1"></i>@TempData["Hata"]</span>
                 }
+                @await Component.InvokeAsync("BildirimCani")
                 <span class="text-muted small"><i class="bi bi-person-circle me-1"></i>@kullaniciAdi</span>
                 <span class="badge rounded-pill" style="background:var(--atom-secondary);font-size:.7rem;">@rolAdi</span>
                 <form method="post" action="/cikis" class="m-0">

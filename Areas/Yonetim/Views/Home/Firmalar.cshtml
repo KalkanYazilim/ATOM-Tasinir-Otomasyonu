@@ -1,0 +1,26 @@
+@model List<ATOM.Models.Domain.Firma>
+@{ ViewData["Title"] = "Firmalar"; var tr = new System.Globalization.CultureInfo("tr-TR"); }
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item active">Firmalar</li></ol> }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-briefcase me-2 text-primary"></i>Tedarikçi Firmalar</h5>
+    <a href="/yonetim/Home/FirmaDuzenle" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Yeni Firma</a>
+</div>
+<div class="card"><div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+        <thead class="table-light"><tr><th>Firma</th><th>Vergi No</th><th>Yetkili</th><th>Telefon</th><th class="text-center">Puan</th><th class="text-center">İhale</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var f in Model)
+        {
+            <tr>
+                <td class="fw-semibold">@f.Ad</td><td class="small">@f.VergiNo</td><td class="small">@f.YetkiliKisi</td>
+                <td class="small">@f.Telefon</td>
+                <td class="text-center">@f.PuanOrtalama.ToString("0.0")</td>
+                <td class="text-center">@f.TamamlananIhale</td>
+                <td><a href="/yonetim/Home/FirmaDuzenle/@f.Id" class="btn btn-sm btn-outline-secondary py-0">Düzenle</a></td>
+            </tr>
+        }
+        @if (!Model.Any()) { <tr><td colspan="7" class="text-center text-muted py-4">Firma yok.</td></tr> }
+        </tbody>
+    </table>
+</div></div></div>

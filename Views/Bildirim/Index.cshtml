@@ -1,0 +1,46 @@
+@model List<ATOM.Models.Domain.Bildirim>
+@using ATOM.Models.Domain
+@{ ViewData["Title"] = "Bildirimler"; }
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item active">Bildirimler</li></ol> }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-bell me-2 text-primary"></i>Bildirimler
+        @if (Model.Any(b => !b.OkunduMu)) { <span class="badge bg-danger">@Model.Count(b => !b.OkunduMu)</span> }
+    </h5>
+    @if (Model.Any(b => !b.OkunduMu))
+    {
+        <form method="post" action="/Bildirim/TumunuOku"><button class="btn btn-outline-secondary btn-sm">Tümünü Okundu İşaretle</button></form>
+    }
+</div>
+
+<div class="card"><div class="list-group list-group-flush">
+@foreach (var b in Model)
+{
+    var icon = b.Tur switch { BildirimTur.Uyari => "exclamation-triangle text-warning", BildirimTur.Hata => "x-circle text-danger", BildirimTur.Basari => "check-circle text-success", _ => "info-circle text-primary" };
+    <div class="list-group-item @(b.OkunduMu ? "" : "bg-light")">
+        <div class="d-flex justify-content-between align-items-start">
+            <div class="d-flex gap-2">
+                <i class="bi bi-@icon fs-5"></i>
+                <div>
+                    <div class="fw-semibold">@b.Baslik @if (!b.OkunduMu) { <span class="badge bg-primary ms-1" style="font-size:.6rem;">Yeni</span> }</div>
+                    <div class="text-muted small">@b.Mesaj</div>
+                    <div class="text-muted" style="font-size:.72rem;">@b.Tarih.ToString("dd.MM.yyyy HH:mm")</div>
+                </div>
+            </div>
+            <div class="d-flex gap-1">
+                @if (!string.IsNullOrEmpty(b.LinkUrl))
+                {
+                    <form method="post" action="/Bildirim/Oku"><input type="hidden" name="id" value="@b.Id"/><input type="hidden" name="donus" value="@b.LinkUrl"/>
+                        <button class="btn btn-sm btn-outline-primary py-0">Git</button></form>
+                }
+                else if (!b.OkunduMu)
+                {
+                    <form method="post" action="/Bildirim/Oku"><input type="hidden" name="id" value="@b.Id"/>
+                        <button class="btn btn-sm btn-outline-secondary py-0">Okundu</button></form>
+                }
+            </div>
+        </div>
+    </div>
+}
+@if (!Model.Any()) { <div class="list-group-item text-center text-muted py-4">Bildiriminiz yok.</div> }
+</div></div>

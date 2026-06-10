@@ -1,0 +1,42 @@
+@model ATOM.Models.Domain.Kurum
+@using ATOM.Models.Domain
+@{
+    ViewData["Title"] = string.IsNullOrEmpty(Model.Id) ? "Yeni Kurum" : "Kurum Düzenle";
+    var kurumlar = ViewBag.Kurumlar as List<Kurum> ?? new();
+}
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/yonetim/Home/Kurumlar">Kurumlar</a></li><li class="breadcrumb-item active">@ViewData["Title"]</li></ol> }
+
+<form method="post" action="/yonetim/Home/KurumDuzenle">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="Id" value="@Model.Id"/>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0 fw-bold"><i class="bi bi-bank me-2 text-primary"></i>@ViewData["Title"]</h5>
+        <div><a href="/yonetim/Home/Kurumlar" class="btn btn-outline-secondary btn-sm">İptal</a>
+            <button class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Kaydet</button></div>
+    </div>
+    <div class="card"><div class="card-body"><div class="row g-3">
+        <div class="col-md-6"><label class="form-label small fw-semibold">Ad <span class="text-danger">*</span></label><input name="Ad" value="@Model.Ad" class="form-control form-control-sm" required/></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold">Kod</label><input name="Kod" value="@Model.Kod" class="form-control form-control-sm"/></div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold">Tür</label>
+            <select name="Tur" class="form-select form-select-sm">
+                @foreach (var t in Enum.GetValues<KurumTur>())
+                { if (Model.Tur == t) { <option value="@t" selected>@t</option> } else { <option value="@t">@t</option> } }
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold">Üst Kurum</label>
+            <select name="UstKurumId" class="form-select form-select-sm">
+                <option value="">– Yok –</option>
+                @foreach (var k in kurumlar.Where(x => x.Id != Model.Id))
+                { if (Model.UstKurumId == k.Id) { <option value="@k.Id" selected>@k.Ad</option> } else { <option value="@k.Id">@k.Ad</option> } }
+            </select>
+        </div>
+        <div class="col-md-4"><label class="form-label small fw-semibold">İl</label><input name="Il" value="@Model.Il" class="form-control form-control-sm"/></div>
+        <div class="col-md-4"><label class="form-label small fw-semibold">İlçe</label><input name="Ilce" value="@Model.Ilce" class="form-control form-control-sm"/></div>
+        <div class="col-md-6"><label class="form-label small fw-semibold">Telefon</label><input name="Telefon" value="@Model.Telefon" class="form-control form-control-sm"/></div>
+        <div class="col-md-6"><label class="form-label small fw-semibold">E-posta</label><input name="Email" value="@Model.Email" class="form-control form-control-sm"/></div>
+        <div class="col-12"><label class="form-label small fw-semibold">Adres</label><input name="Adres" value="@Model.Adres" class="form-control form-control-sm"/></div>
+        <div class="col-12"><div class="form-check"><input type="checkbox" name="AktifMi" value="true" class="form-check-input" id="aktif" @(Model.AktifMi || string.IsNullOrEmpty(Model.Id) ? "checked" : "")/><label class="form-check-label" for="aktif">Aktif</label></div></div>
+    </div></div></div>
+</form>

@@ -23,6 +23,31 @@
     </span>
 </div>
 
+@if (Model.Gorevler.Any())
+{
+    <div class="card mb-4 border-start border-4" style="border-color:var(--atom-accent)!important;">
+        <div class="card-header bg-white fw-semibold"><i class="bi bi-inbox me-2 text-primary"></i>Bekleyen Görevlerim</div>
+        <div class="card-body">
+            <div class="row g-2">
+                @foreach (var g in Model.Gorevler)
+                {
+                    <div class="col-md-4 col-sm-6">
+                        <a href="@g.Link" class="text-decoration-none">
+                            <div class="d-flex align-items-center gap-3 p-2 rounded border bg-light">
+                                <span class="badge bg-@g.Renk rounded-circle p-2"><i class="bi bi-@g.Ikon"></i></span>
+                                <div>
+                                    <div class="fs-5 fw-bold text-dark">@g.Sayi</div>
+                                    <div class="text-muted small">@g.Baslik</div>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
 <!-- STAT KARTLARI -->
 <div class="row g-3 mb-4">
     <div class="col-sm-6 col-lg-3">

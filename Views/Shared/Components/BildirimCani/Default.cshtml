@@ -1,0 +1,8 @@
+@model int
+<a href="/Bildirim" class="btn btn-sm btn-outline-secondary position-relative" title="Bildirimler">
+    <i class="bi bi-bell"></i>
+    @if (Model > 0)
+    {
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:.6rem;">@Model</span>
+    }
+</a>

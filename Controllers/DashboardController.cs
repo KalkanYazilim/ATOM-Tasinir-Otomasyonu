@@ -33,6 +33,49 @@ public class DashboardController : Controller
             ? depolar
             : depolar.Where(d => d.KurumId == kurumId).ToList();
 
+        // ── Görev Kutusu (role göre bekleyen işler) ──
+        var gorevler = new List<GorevKutusuItem>();
+        bool bakanlik = AtomRoller.BakanlikRolleri.Contains(rol);
+
+        if (rol == AtomRoller.IlMuduru)
+        {
+            var ilOnay = talepler.Count(t => t.TalepciKurumId == kurumId && t.Durum == TalepDurumu.GonderildiIlOnay);
+            if (ilOnay > 0) gorevler.Add(new("İl onayı bekleyen talep", ilOnay, "/talep?durum=GonderildiIlOnay", "clipboard-check", "warning"));
+        }
+        if (rol == AtomRoller.BakanlikMerkez || rol == AtomRoller.SistemAdmin)
+        {
+            var bakOnay = talepler.Count(t => t.Durum == TalepDurumu.IlOnaylandi);
+            if (bakOnay > 0) gorevler.Add(new("Bakanlık incelemesi bekleyen", bakOnay, "/talep?durum=IlOnaylandi", "clipboard-check", "warning"));
+        }
+        if (new[] { AtomRoller.MerkezDepoSorumlusu, AtomRoller.IlDepoSorumlusu, AtomRoller.BakanlikMerkez, AtomRoller.SistemAdmin }.Contains(rol))
+        {
+            var mkOnay = (await _svc.MalKabulleriGetirAsync()).Count(m => m.Durum == OnayDurumu.Bekliyor &&
+                (bakanlik || gorunenDepolar.Any(d => d.Id == m.DepoId)));
+            if (mkOnay > 0) gorevler.Add(new("Onay bekleyen mal kabul", mkOnay, "/depo/Home/MalKabuller", "box-arrow-in-down", "info"));
+
+            var sevkBekleyen = (await _svc.SevkleriGetirAsync()).Count(s => s.Durum == SevkDurumu.Hazirlaniyor &&
+                (bakanlik || gorunenDepolar.Any(d => d.Id == s.HedefDepoId)));
+            if (sevkBekleyen > 0) gorevler.Add(new("Teslim bekleyen sevk", sevkBekleyen, "/depo/Home/Sevkler", "truck", "info"));
+
+            if (KritikStokSayisiHesapla(gorunenDepolar) > 0)
+                gorevler.Add(new("Kritik stok kalemi", KritikStokSayisiHesapla(gorunenDepolar), "/depo", "exclamation-triangle", "danger"));
+        }
+        if (new[] { AtomRoller.Teknisyen, AtomRoller.IlDepoSorumlusu, AtomRoller.IlMuduru, AtomRoller.SistemAdmin }.Contains(rol))
+        {
+            var acikBakim = bakimlar.Count(b => b.Durum == BakimDurumu.Acik);
+            if (acikBakim > 0) gorevler.Add(new("Açık arıza kaydı", acikBakim, "/zimmet/Home/Bakim", "tools", "warning"));
+        }
+        if (rol == AtomRoller.Personel)
+        {
+            var benimZimmet = zimmetler.Count(z => z.PersonelId == kullaniciId && z.Durum == ZimmetDurumu.Aktif);
+            if (benimZimmet > 0) gorevler.Add(new("Üzerimdeki aktif zimmet", benimZimmet, "/zimmet", "person-badge", "info"));
+        }
+        if (rol == AtomRoller.BakanlikMerkez || rol == AtomRoller.SistemAdmin)
+        {
+            var hurdaOnay = (await _svc.HurdaKayitlariGetirAsync()).Count(h => h.Durum == HurdaDurumu.Komisyon);
+            if (hurdaOnay > 0) gorevler.Add(new("Üst onay bekleyen hurda/düşüm", hurdaOnay, "/hurda", "trash3", "danger"));
+        }
+
         var vm = new DashboardViewModel
         {
             Rol = rol,
@@ -101,11 +144,17 @@ public class DashboardController : Controller
                 }).ToList(),
 
             Kurumlar = kurumlar,
+            Gorevler = gorevler,
         };
 
         return View(vm);
     }
+
+    private static int KritikStokSayisiHesapla(List<Depo> depolar)
+        => depolar.SelectMany(d => d.Stoklar).Count(s => s.MinEsik > 0 && s.Miktar <= s.MinEsik);
 }
+
+public record GorevKutusuItem(string Baslik, int Sayi, string Link, string Ikon, string Renk);
 
 public class DashboardViewModel
 {
@@ -127,6 +176,7 @@ public class DashboardViewModel
     public List<KategoriStok> KategoriBazliStok { get; set; } = new();
     public List<AylikTrend> AylikTalepTrendi { get; set; } = new();
     public List<Kurum> Kurumlar { get; set; } = new();
+    public List<GorevKutusuItem> Gorevler { get; set; } = new();
 }
 
 public class DepoStokOzet

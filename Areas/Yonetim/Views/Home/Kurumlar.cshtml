@@ -1,0 +1,26 @@
+@model List<ATOM.Models.Domain.Kurum>
+@using ATOM.Models.Domain
+@{ ViewData["Title"] = "Kurumlar"; }
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item active">Kurumlar</li></ol> }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-bank me-2 text-primary"></i>Kurumlar</h5>
+    <a href="/yonetim/Home/KurumDuzenle" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Yeni Kurum</a>
+</div>
+<div class="card"><div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+        <thead class="table-light"><tr><th>Ad</th><th>Kod</th><th>Tür</th><th>İl</th><th>Durum</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var k in Model)
+        {
+            <tr>
+                <td class="fw-semibold">@k.Ad</td><td class="small">@k.Kod</td>
+                <td><span class="badge bg-secondary">@k.Tur</span></td><td class="small">@k.Il</td>
+                <td>@(k.AktifMi ? "<span class='badge bg-success'>Aktif</span>" : "<span class='badge bg-secondary'>Pasif</span>")</td>
+                <td><a href="/yonetim/Home/KurumDuzenle/@k.Id" class="btn btn-sm btn-outline-secondary py-0">Düzenle</a></td>
+            </tr>
+        }
+        @if (!Model.Any()) { <tr><td colspan="6" class="text-center text-muted py-4">Kurum yok.</td></tr> }
+        </tbody>
+    </table>
+</div></div></div>

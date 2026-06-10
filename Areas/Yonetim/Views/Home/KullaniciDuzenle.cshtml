@@ -1,0 +1,49 @@
+@model ATOM.Models.Accounts.AtomKullanici
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@{
+    ViewData["Title"] = string.IsNullOrEmpty(Model.Id) ? "Yeni Kullanıcı" : "Kullanıcı Düzenle";
+    var kurumlar = ViewBag.Kurumlar as List<Kurum> ?? new();
+    var roller = ViewBag.Roller as string[] ?? AtomRoller.Tumu;
+    bool yeni = string.IsNullOrEmpty(Model.Id);
+}
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/yonetim/Home/Kullanicilar">Kullanıcılar</a></li><li class="breadcrumb-item active">@ViewData["Title"]</li></ol> }
+
+<form method="post" action="/yonetim/Home/KullaniciDuzenle">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="Id" value="@Model.Id"/>
+    <input type="hidden" name="OlusturmaTarihi" value="@Model.OlusturmaTarihi.ToString("o")"/>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0 fw-bold"><i class="bi bi-person-gear me-2 text-primary"></i>@ViewData["Title"]</h5>
+        <div><a href="/yonetim/Home/Kullanicilar" class="btn btn-outline-secondary btn-sm">İptal</a>
+            <button class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Kaydet</button></div>
+    </div>
+    <div class="card"><div class="card-body"><div class="row g-3">
+        <div class="col-md-6"><label class="form-label small fw-semibold">Ad Soyad <span class="text-danger">*</span></label><input name="AdSoyad" value="@Model.AdSoyad" class="form-control form-control-sm" required/></div>
+        <div class="col-md-6"><label class="form-label small fw-semibold">Kullanıcı Adı <span class="text-danger">*</span></label><input name="KullaniciAdi" value="@Model.KullaniciAdi" class="form-control form-control-sm" required/></div>
+        <div class="col-md-6"><label class="form-label small fw-semibold">E-posta</label><input name="Email" type="email" value="@Model.Email" class="form-control form-control-sm"/></div>
+        <div class="col-md-6"><label class="form-label small fw-semibold">Telefon</label><input name="Telefon" value="@Model.Telefon" class="form-control form-control-sm"/></div>
+        <div class="col-md-6">
+            <label class="form-label small fw-semibold">Rol</label>
+            <select name="Rol" class="form-select form-select-sm">
+                @foreach (var r in roller)
+                {
+                    if (Model.Rol == r) { <option value="@r" selected>@AtomRoller.DisplayName(r)</option> }
+                    else { <option value="@r">@AtomRoller.DisplayName(r)</option> }
+                }
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label small fw-semibold">Kurum</label>
+            <select name="KurumId" class="form-select form-select-sm">
+                @foreach (var k in kurumlar)
+                {
+                    if (Model.KurumId == k.Id) { <option value="@k.Id" selected>@k.Ad</option> }
+                    else { <option value="@k.Id">@k.Ad</option> }
+                }
+            </select>
+        </div>
+        <div class="col-md-6"><label class="form-label small fw-semibold">@(yeni ? "Şifre" : "Yeni Şifre (boş = değişmez)")</label><input name="yeniSifre" type="password" class="form-control form-control-sm" @(yeni ? "required" : "")/></div>
+        <div class="col-md-6 d-flex align-items-end"><div class="form-check"><input type="checkbox" name="AktifMi" value="true" class="form-check-input" id="aktif" @(Model.AktifMi || yeni ? "checked" : "")/><label class="form-check-label" for="aktif">Aktif</label></div></div>
+    </div></div></div>
+</form>
