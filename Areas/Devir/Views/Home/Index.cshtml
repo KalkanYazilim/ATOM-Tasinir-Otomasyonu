@@ -1,0 +1,47 @@
+@model List<ATOM.Models.Domain.DevirKaydi>
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@using System.Security.Claims
+@{
+    ViewData["Title"] = "Devir";
+    var kurumlar = ViewBag.Kurumlar as Dictionary<string, string> ?? new();
+    var depolar = ViewBag.Depolar as Dictionary<string, string> ?? new();
+    var rol = User.FindFirstValue(ClaimTypes.Role) ?? "";
+    bool olusturabilir = new[]{AtomRoller.IlDepoSorumlusu,AtomRoller.MerkezDepoSorumlusu,AtomRoller.IlMuduru,AtomRoller.BakanlikMerkez,AtomRoller.SistemAdmin}.Contains(rol);
+}
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item active">Devir</li></ol> }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-arrow-left-right me-2 text-primary"></i>Devir İşlemleri</h5>
+    @if (olusturabilir) { <a href="/devir/Home/Yeni" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Yeni Devir</a> }
+</div>
+
+<div class="card"><div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+        <thead class="table-light"><tr><th>Devir No</th><th>Tür</th><th>Kaynak</th><th>Hedef</th><th>Tarih</th><th class="text-center">Kalem</th><th>Durum</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var d in Model)
+        {
+            <tr>
+                <td class="fw-semibold">@d.DevirNo</td>
+                <td><span class="badge bg-secondary">@d.Tur</span></td>
+                <td class="small">@(depolar.TryGetValue(d.KaynakDepoId, out var kd) ? kd : (kurumlar.TryGetValue(d.KaynakKurumId, out var kk) ? kk : "–"))</td>
+                <td class="small">@(depolar.TryGetValue(d.HedefDepoId, out var hd) ? hd : (kurumlar.TryGetValue(d.HedefKurumId, out var hk) ? hk : "–"))</td>
+                <td class="small">@d.DevirTarihi.ToString("dd.MM.yyyy")</td>
+                <td class="text-center">@d.Kalemler.Count</td>
+                <td>
+                    @switch (d.Durum)
+                    {
+                        case DevirDurumu.AlanOnayiBekliyor: <span class="badge bg-warning text-dark">Alan Onayı Bekliyor</span> break;
+                        case DevirDurumu.Tamamlandi: <span class="badge bg-success">Tamamlandı</span> break;
+                        case DevirDurumu.Reddedildi: <span class="badge bg-danger">Reddedildi</span> break;
+                        default: <span class="badge bg-secondary">@d.Durum</span> break;
+                    }
+                </td>
+                <td><a href="/devir/Home/Detay/@d.Id" class="btn btn-sm btn-outline-secondary py-0">Detay</a></td>
+            </tr>
+        }
+        @if (!Model.Any()) { <tr><td colspan="8" class="text-center text-muted py-4">Devir kaydı yok.</td></tr> }
+        </tbody>
+    </table>
+</div></div></div>

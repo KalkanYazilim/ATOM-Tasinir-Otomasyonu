@@ -1,0 +1,86 @@
+@model ATOM.Models.Domain.SayimKaydi
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@using System.Security.Claims
+@{
+    ViewData["Title"] = $"Sayım – {Model.SayimNo}";
+    var tanimlar = ViewBag.Tanimlar as Dictionary<string, string> ?? new();
+    var depo = ViewBag.Depo as Depo;
+    var rol = User.FindFirstValue(ClaimTypes.Role) ?? "";
+    bool sayimGirebilir = new[]{AtomRoller.IlDepoSorumlusu,AtomRoller.MerkezDepoSorumlusu,AtomRoller.IlMuduru,AtomRoller.SistemAdmin}.Contains(rol);
+    bool onaylayabilir = new[]{AtomRoller.IlMuduru,AtomRoller.MerkezDepoSorumlusu,AtomRoller.BakanlikMerkez,AtomRoller.SistemAdmin}.Contains(rol);
+}
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/sayim">Sayım</a></li><li class="breadcrumb-item active">@Model.SayimNo</li></ol> }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-clipboard-check me-2 text-primary"></i>@Model.SayimNo – @Model.Baslik</h5>
+    <div class="d-flex gap-2 align-items-center">
+        <span class="badge bg-@(Model.Durum==SayimDurumu.Tamamlandi?"success":Model.Durum==SayimDurumu.OnayBekliyor?"warning text-dark":"info")">@Model.Durum</span>
+        <a href="/sayim/Home/Tutanak/@Model.Id" target="_blank" class="btn btn-outline-secondary btn-sm"><i class="bi bi-printer me-1"></i>Tutanak</a>
+    </div>
+</div>
+
+@{
+    var farkli = Model.Kalemler.Count(k => k.Fark != 0);
+    var fazla = Model.Kalemler.Where(k => k.Fark > 0).Sum(k => k.Fark);
+    var noksan = Model.Kalemler.Where(k => k.Fark < 0).Sum(k => -k.Fark);
+}
+<div class="row g-2 mb-3">
+    <div class="col-md-3"><div class="card stat-card info"><div class="card-body py-2"><div class="text-muted small">Toplam Kalem</div><div class="fs-4 fw-bold">@Model.Kalemler.Count</div></div></div></div>
+    <div class="col-md-3"><div class="card stat-card warning"><div class="card-body py-2"><div class="text-muted small">Farklı Kalem</div><div class="fs-4 fw-bold">@farkli</div></div></div></div>
+    <div class="col-md-3"><div class="card stat-card success"><div class="card-body py-2"><div class="text-muted small">Toplam Fazla</div><div class="fs-4 fw-bold text-success">+@fazla</div></div></div></div>
+    <div class="col-md-3"><div class="card stat-card danger"><div class="card-body py-2"><div class="text-muted small">Toplam Noksan</div><div class="fs-4 fw-bold text-danger">-@noksan</div></div></div></div>
+</div>
+
+<form method="post" action="/sayim/Home/FiiliKaydet">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="id" value="@Model.Id"/>
+    <div class="card">
+        <div class="card-header bg-white fw-semibold d-flex justify-content-between">
+            <span><i class="bi bi-list-ol me-2"></i>Sayım Kalemleri</span>
+            @if (sayimGirebilir && Model.Durum == SayimDurumu.DevamEdiyor)
+            { <button class="btn btn-primary btn-sm py-0"><i class="bi bi-save me-1"></i>Fiili Sayımı Kaydet</button> }
+        </div>
+        <div class="card-body p-0"><div class="table-responsive">
+            <table class="table table-sm mb-0 align-middle">
+                <thead class="table-light"><tr><th>Taşınır</th><th class="text-center">Kaydi</th><th class="text-center">Fiili</th><th class="text-center">Hasarlı</th><th class="text-center">Fark</th></tr></thead>
+                <tbody>
+                @foreach (var k in Model.Kalemler)
+                {
+                    <tr class="@(k.Fark!=0?"table-warning":"")">
+                        <td>@(tanimlar.TryGetValue(k.TasinirTanimId, out var t) ? t : k.TasinirTanimId)
+                            <input type="hidden" name="tanimIds" value="@k.TasinirTanimId"/></td>
+                        <td class="text-center fw-semibold">@k.KaydiMiktar</td>
+                        <td class="text-center" style="width:110px">
+                            @if (Model.Durum == SayimDurumu.DevamEdiyor && sayimGirebilir)
+                            { <input name="fiiliMiktarlar" type="number" value="@k.FiiliMiktar" class="form-control form-control-sm text-center"/> }
+                            else { <span>@k.FiiliMiktar</span><input type="hidden" name="fiiliMiktarlar" value="@k.FiiliMiktar"/> }
+                        </td>
+                        <td class="text-center" style="width:100px">
+                            @if (Model.Durum == SayimDurumu.DevamEdiyor && sayimGirebilir)
+                            { <input name="hasarliMiktarlar" type="number" value="@k.HasarliMiktar" class="form-control form-control-sm text-center"/> }
+                            else { <span>@k.HasarliMiktar</span><input type="hidden" name="hasarliMiktarlar" value="@k.HasarliMiktar"/> }
+                        </td>
+                        <td class="text-center fw-bold @(k.Fark>0?"text-success":k.Fark<0?"text-danger":"")">@(k.Fark > 0 ? "+" + k.Fark : k.Fark.ToString())</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div></div>
+    </div>
+</form>
+
+@if (onaylayabilir && Model.Durum == SayimDurumu.OnayBekliyor)
+{
+    <div class="card mt-3 border-success"><div class="card-body">
+        <form method="post" action="/sayim/Home/FarkOnayla">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" value="@Model.Id"/>
+            <label class="form-label small fw-semibold">Tutanak Notu / Fark Onayı</label>
+            <div class="input-group">
+                <input name="tutanakNotu" class="form-control form-control-sm" placeholder="Sayım farkları onaylanıyor..."/>
+                <button class="btn btn-success btn-sm"><i class="bi bi-check2-circle me-1"></i>Farkları Onayla & Stok Düzelt</button>
+            </div>
+        </form>
+    </div></div>
+}

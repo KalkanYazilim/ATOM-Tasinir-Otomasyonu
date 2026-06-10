@@ -1,0 +1,45 @@
+@model List<ATOM.Models.Domain.HurdaKaydi>
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@using System.Security.Claims
+@{
+    ViewData["Title"] = "Hurda / Düşüm / Kayıp";
+    var kurumlar = ViewBag.Kurumlar as Dictionary<string, string> ?? new();
+    var rol = User.FindFirstValue(ClaimTypes.Role) ?? "";
+    bool olusturabilir = new[]{AtomRoller.IlDepoSorumlusu,AtomRoller.MerkezDepoSorumlusu,AtomRoller.IlMuduru,AtomRoller.SistemAdmin}.Contains(rol);
+}
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item active">Hurda / Düşüm / Kayıp</li></ol> }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-trash3 me-2 text-primary"></i>Hurda / Düşüm / Kayıp İşlemleri</h5>
+    @if (olusturabilir) { <a href="/hurda/Home/Yeni" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Yeni Talep</a> }
+</div>
+
+<div class="card"><div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+        <thead class="table-light"><tr><th>Hurda No</th><th>Tür</th><th>Kurum</th><th class="text-center">Kalem</th><th>Tarih</th><th>Durum</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var h in Model)
+        {
+            <tr>
+                <td class="fw-semibold">@h.HurdaNo</td>
+                <td><span class="badge bg-secondary">@h.DusumTuru</span></td>
+                <td class="small">@(kurumlar.TryGetValue(h.KurumId, out var k) ? k : "–")</td>
+                <td class="text-center">@h.Kalemler.Count</td>
+                <td class="small">@h.TalepTarihi.ToString("dd.MM.yyyy")</td>
+                <td>
+                    @switch (h.Durum)
+                    {
+                        case HurdaDurumu.Talep: <span class="badge bg-warning text-dark">Talep</span> break;
+                        case HurdaDurumu.Komisyon: <span class="badge bg-info">Komisyonda</span> break;
+                        case HurdaDurumu.Onaylandi: <span class="badge bg-success">Onaylandı</span> break;
+                        case HurdaDurumu.Imha: <span class="badge bg-dark">İmha</span> break;
+                    }
+                </td>
+                <td><a href="/hurda/Home/Detay/@h.Id" class="btn btn-sm btn-outline-secondary py-0">Detay</a></td>
+            </tr>
+        }
+        @if (!Model.Any()) { <tr><td colspan="7" class="text-center text-muted py-4">Kayıt yok.</td></tr> }
+        </tbody>
+    </table>
+</div></div></div>

@@ -1,0 +1,46 @@
+@model List<ATOM.Models.Domain.SayimKaydi>
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@using System.Security.Claims
+@{
+    ViewData["Title"] = "Sayım";
+    var depolar = ViewBag.Depolar as Dictionary<string, string> ?? new();
+    var rol = User.FindFirstValue(ClaimTypes.Role) ?? "";
+    bool olusturabilir = new[]{AtomRoller.IlDepoSorumlusu,AtomRoller.MerkezDepoSorumlusu,AtomRoller.IlMuduru,AtomRoller.SistemAdmin}.Contains(rol);
+}
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item active">Sayım</li></ol> }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-clipboard-check me-2 text-primary"></i>Sayım İşlemleri</h5>
+    @if (olusturabilir) { <a href="/sayim/Home/Yeni" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Yeni Sayım</a> }
+</div>
+
+<div class="card"><div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+        <thead class="table-light"><tr><th>Sayım No</th><th>Başlık</th><th>Depo</th><th>Başlangıç</th><th class="text-center">Kalem</th><th class="text-center">Farklı</th><th>Durum</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var s in Model)
+        {
+            <tr>
+                <td class="fw-semibold">@s.SayimNo</td>
+                <td class="small">@s.Baslik</td>
+                <td class="small">@(depolar.TryGetValue(s.DepoId, out var d) ? d : "–")</td>
+                <td class="small">@s.BaslangicTarihi.ToString("dd.MM.yyyy")</td>
+                <td class="text-center">@s.Kalemler.Count</td>
+                <td class="text-center">@s.Kalemler.Count(k => k.Fark != 0)</td>
+                <td>
+                    @switch (s.Durum)
+                    {
+                        case SayimDurumu.DevamEdiyor: <span class="badge bg-info">Devam Ediyor</span> break;
+                        case SayimDurumu.OnayBekliyor: <span class="badge bg-warning text-dark">Onay Bekliyor</span> break;
+                        case SayimDurumu.Tamamlandi: <span class="badge bg-success">Tamamlandı</span> break;
+                        default: <span class="badge bg-secondary">@s.Durum</span> break;
+                    }
+                </td>
+                <td><a href="/sayim/Home/Detay/@s.Id" class="btn btn-sm btn-outline-secondary py-0">Detay</a></td>
+            </tr>
+        }
+        @if (!Model.Any()) { <tr><td colspan="8" class="text-center text-muted py-4">Sayım kaydı yok.</td></tr> }
+        </tbody>
+    </table>
+</div></div></div>

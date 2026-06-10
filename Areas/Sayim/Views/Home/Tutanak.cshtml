@@ -1,0 +1,53 @@
+@model ATOM.Models.Domain.SayimKaydi
+@using ATOM.Models.Domain
+@{
+    Layout = null;
+    var tanimlar = ViewBag.Tanimlar as Dictionary<string, string> ?? new();
+    var depo = ViewBag.Depo as Depo;
+    var kurum = ViewBag.Kurum as Kurum;
+}
+<!DOCTYPE html>
+<html lang="tr"><head><meta charset="utf-8"/><title>Sayım Tutanağı – @Model.SayimNo</title>
+<style>
+    body { font-family:'Times New Roman',serif; font-size:12pt; margin:2cm; }
+    h2 { text-align:center; } .ust { text-align:center; margin-bottom:16px; }
+    table { width:100%; border-collapse:collapse; margin:12px 0; }
+    th,td { border:1px solid #000; padding:4px 6px; font-size:10.5pt; }
+    th { background:#eee; } .imza { margin-top:50px; display:flex; justify-content:space-around; }
+    .imza div { text-align:center; } .imza .line { margin-top:46px; border-top:1px solid #000; padding-top:3px; }
+    @@media print { .no-print { display:none; } body { margin:1cm; } }
+</style></head>
+<body>
+<div class="no-print" style="text-align:right;"><button onclick="window.print()" style="padding:6px 16px;">🖨 Yazdır</button></div>
+<div class="ust"><strong>@(kurum?.Ad ?? "T.C. ........... BAKANLIĞI")</strong><br/>@(depo?.Ad)</div>
+<h2>TAŞINIR SAYIM TUTANAĞI</h2>
+<p><strong>Sayım No:</strong> @Model.SayimNo &nbsp; <strong>Başlık:</strong> @Model.Baslik &nbsp;
+   <strong>Tarih:</strong> @Model.BaslangicTarihi.ToString("dd.MM.yyyy") @(Model.BitisTarihi.HasValue ? "- "+Model.BitisTarihi.Value.ToString("dd.MM.yyyy") : "")</p>
+
+<table>
+    <thead><tr><th>S.No</th><th>Taşınır</th><th>Kaydi Miktar</th><th>Fiili Miktar</th><th>Fazla</th><th>Noksan</th><th>Hasarlı</th></tr></thead>
+    <tbody>
+    @{ int s = 1; }
+    @foreach (var k in Model.Kalemler)
+    {
+        <tr>
+            <td style="text-align:center">@(s++)</td>
+            <td>@(tanimlar.TryGetValue(k.TasinirTanimId, out var t) ? t : k.TasinirTanimId)</td>
+            <td style="text-align:center">@k.KaydiMiktar</td>
+            <td style="text-align:center">@k.FiiliMiktar</td>
+            <td style="text-align:center">@(k.Fark > 0 ? k.Fark.ToString() : "")</td>
+            <td style="text-align:center">@(k.Fark < 0 ? (-k.Fark).ToString() : "")</td>
+            <td style="text-align:center">@(k.HasarliMiktar > 0 ? k.HasarliMiktar.ToString() : "")</td>
+        </tr>
+    }
+    </tbody>
+</table>
+@if (!string.IsNullOrEmpty(Model.TutanakNotu)) { <p><strong>Açıklama:</strong> @Model.TutanakNotu</p> }
+
+<p style="font-size:10pt;margin-top:20px;">İşbu tutanak, yukarıda belirtilen taşınırların fiili sayımı sonucunda düzenlenmiştir.</p>
+<div class="imza">
+    <div><div class="line">Komisyon Başkanı</div></div>
+    <div><div class="line">Üye</div></div>
+    <div><div class="line">Üye</div></div>
+</div>
+</body></html>

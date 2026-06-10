@@ -105,6 +105,14 @@
             <a class="nav-link" href="/zimmet"><i class="bi bi-person-badge"></i> Zimmet Listesi</a>
             <a class="nav-link" href="/zimmet/Home/Bakim"><i class="bi bi-tools"></i> Bakım & Arıza</a>
 
+            @if (rol != AtomRoller.Tedarikci && rol != AtomRoller.Personel)
+            {
+                <div class="nav-section">Taşınır İşlemleri</div>
+                <a class="nav-link" href="/sayim"><i class="bi bi-clipboard-check"></i> Sayım</a>
+                <a class="nav-link" href="/devir"><i class="bi bi-arrow-left-right"></i> Devir</a>
+                <a class="nav-link" href="/hurda"><i class="bi bi-trash3"></i> Hurda / Düşüm</a>
+            }
+
             @if (AtomRoller.BakanlikRolleri.Contains(rol) || rol == AtomRoller.IlMuduru)
             {
                 <div class="nav-section">Analiz</div>

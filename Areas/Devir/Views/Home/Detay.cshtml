@@ -1,0 +1,77 @@
+@model ATOM.Models.Domain.DevirKaydi
+@using ATOM.Models.Domain
+@using ATOM.Models.Accounts
+@using System.Security.Claims
+@{
+    ViewData["Title"] = $"Devir – {Model.DevirNo}";
+    var tanimlar = ViewBag.Tanimlar as Dictionary<string, string> ?? new();
+    var depolar = ViewBag.Depolar as Dictionary<string, string> ?? new();
+    var kurumlar = ViewBag.Kurumlar as Dictionary<string, string> ?? new();
+    var rol = User.FindFirstValue(ClaimTypes.Role) ?? "";
+    var kurumId = User.FindFirstValue("KurumId") ?? "";
+    bool alanOnayci = (AtomRoller.BakanlikRolleri.Contains(rol) || Model.HedefKurumId == kurumId)
+        && new[]{AtomRoller.IlMuduru,AtomRoller.IlDepoSorumlusu,AtomRoller.MerkezDepoSorumlusu,AtomRoller.BakanlikMerkez,AtomRoller.SistemAdmin}.Contains(rol);
+}
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/devir">Devir</a></li><li class="breadcrumb-item active">@Model.DevirNo</li></ol> }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-arrow-left-right me-2 text-primary"></i>@Model.DevirNo
+        <span class="badge bg-secondary ms-1">@Model.Tur</span></h5>
+    @if (alanOnayci && Model.Durum == DevirDurumu.AlanOnayiBekliyor)
+    { <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#onayModal">Alan Onayı</button> }
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="card mb-3"><div class="card-body"><div class="row g-3">
+            <div class="col-md-4"><label class="text-muted small">Kaynak Depo</label><div>@(depolar.TryGetValue(Model.KaynakDepoId, out var kd) ? kd : "–")</div></div>
+            <div class="col-md-4"><label class="text-muted small">Hedef Kurum</label><div>@(kurumlar.TryGetValue(Model.HedefKurumId, out var hk) ? hk : "–")</div></div>
+            <div class="col-md-4"><label class="text-muted small">Hedef Depo</label><div>@(depolar.TryGetValue(Model.HedefDepoId, out var hd) ? hd : "–")</div></div>
+            <div class="col-12"><label class="text-muted small">Gerekçe</label><div class="p-2 bg-light rounded">@(string.IsNullOrEmpty(Model.Gerekce)?"–":Model.Gerekce)</div></div>
+        </div></div></div>
+
+        <div class="card"><div class="card-header bg-white fw-semibold">Kalemler (@Model.Kalemler.Count)</div>
+            <div class="card-body p-0"><div class="table-responsive">
+                <table class="table table-sm mb-0"><thead class="table-light"><tr><th>Taşınır</th><th class="text-center">Miktar</th></tr></thead>
+                    <tbody>
+                    @foreach (var k in Model.Kalemler)
+                    { <tr><td>@(tanimlar.TryGetValue(k.TasinirTanimId, out var t) ? t : k.TasinirTanimId)</td><td class="text-center">@k.Miktar</td></tr> }
+                    </tbody>
+                </table>
+            </div></div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card"><div class="card-header bg-white fw-semibold"><i class="bi bi-clock-history me-2"></i>Onay Geçmişi</div>
+            <div class="card-body p-0">
+                @if (Model.OnayGecmisi.Any())
+                {
+                    <div class="list-group list-group-flush">
+                    @foreach (var o in Model.OnayGecmisi.OrderByDescending(x => x.Tarih))
+                    {
+                        <div class="list-group-item py-2"><div class="d-flex justify-content-between">
+                            <span class="fw-semibold small">@o.Asama</span>
+                            <span class="badge bg-@(o.Karar==OnayDurumu.Onaylandi?"success":"danger")">@o.Karar</span></div>
+                            @if (!string.IsNullOrEmpty(o.Aciklama)) { <div class="text-muted small">@o.Aciklama</div> }
+                            <div class="text-muted" style="font-size:.72rem;">@o.KullaniciAdi · @o.Tarih.ToString("dd.MM.yyyy HH:mm")</div></div>
+                    }
+                    </div>
+                }
+                else { <div class="text-muted text-center py-3 small">Henüz işlem yok.</div> }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="onayModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <form method="post" action="/devir/Home/AlanOnay">
+        @Html.AntiForgeryToken()<input type="hidden" name="id" value="@Model.Id"/>
+        <div class="modal-header"><h6 class="modal-title">Devir Alan Onayı</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body"><p class="small text-muted">Onaylanınca stoklar kaynak depodan hedef depoya aktarılır.</p>
+            <textarea name="aciklama" class="form-control form-control-sm" rows="2" placeholder="Açıklama" required></textarea></div>
+        <div class="modal-footer">
+            <button type="submit" name="onayla" value="false" class="btn btn-outline-danger btn-sm">Reddet</button>
+            <button type="submit" name="onayla" value="true" class="btn btn-success btn-sm">Onayla</button>
+        </div>
+    </form>
+</div></div></div>

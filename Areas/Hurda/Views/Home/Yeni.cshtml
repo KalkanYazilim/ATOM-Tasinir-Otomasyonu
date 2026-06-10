@@ -1,0 +1,81 @@
+@model ATOM.Models.Domain.HurdaKaydi
+@using ATOM.Models.Domain
+@{
+    ViewData["Title"] = "Yeni Hurda/Düşüm Talebi";
+    var depolar = ViewBag.Depolar as List<Depo> ?? new();
+    var tanimlar = ViewBag.Tanimlar as Dictionary<string, string> ?? new();
+    var uygun = ViewBag.UygunTasinirlar as List<TasinirKayit> ?? new();
+}
+@section Breadcrumb {
+    <ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/hurda">Hurda</a></li><li class="breadcrumb-item active">Yeni</li></ol>
+}
+
+<form method="post" action="/hurda/Home/Yeni">
+    @Html.AntiForgeryToken()
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0 fw-bold"><i class="bi bi-trash3 me-2 text-primary"></i>Yeni Hurda / Düşüm / Kayıp Talebi</h5>
+        <div><a href="/hurda" class="btn btn-outline-secondary btn-sm">İptal</a>
+            <button class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Talep Oluştur</button></div>
+    </div>
+
+    <div class="card mb-3"><div class="card-body"><div class="row g-3">
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold">Tür</label>
+            <select name="DusumTuru" class="form-select form-select-sm">
+                <option>Hurda</option><option>Kayıp</option><option>Düşüm</option><option>İmha</option><option>Satış</option>
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold">Depo (sarf düşümü için)</label>
+            <select name="DepoId" class="form-select form-select-sm">
+                <option value="">– Seçiniz –</option>
+                @foreach (var d in depolar) { <option value="@d.Id">@d.Ad</option> }
+            </select>
+        </div>
+        <div class="col-12"><label class="form-label small fw-semibold">Gerekçe <span class="text-danger">*</span></label>
+            <textarea name="Gerekce" class="form-control form-control-sm" rows="2" required></textarea></div>
+    </div></div></div>
+
+    <div class="card mb-3">
+        <div class="card-header bg-white fw-semibold"><i class="bi bi-upc-scan me-2"></i>Tekil Demirbaşlar (opsiyonel)</div>
+        <div class="card-body p-0"><div class="table-responsive" style="max-height:280px;overflow:auto;">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light" style="position:sticky;top:0;"><tr><th style="width:40px"></th><th>Cinsi</th><th>Sicil</th><th>Seri</th><th>Durum</th></tr></thead>
+                <tbody>
+                @foreach (var t in uygun)
+                {
+                    <tr><td><input type="checkbox" name="tasinirKayitIds" value="@t.Id" class="form-check-input"/></td>
+                        <td>@t.Cinsi</td><td class="small">@t.SicilNo</td><td class="small text-muted">@t.SeriNo</td>
+                        <td><span class="badge bg-light text-dark">@t.Durum</span></td></tr>
+                }
+                @if (!uygun.Any()) { <tr><td colspan="5" class="text-center text-muted py-3">Uygun tekil taşınır yok.</td></tr> }
+                </tbody>
+            </table>
+        </div></div>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-white fw-semibold d-flex justify-content-between">
+            <span><i class="bi bi-box me-2"></i>Sarf / Miktar Kalemleri (opsiyonel)</span>
+            <button type="button" class="btn btn-outline-primary btn-sm py-0" onclick="kalemEkle()"><i class="bi bi-plus"></i> Ekle</button>
+        </div>
+        <div class="card-body p-0"><div class="table-responsive">
+            <table class="table table-sm mb-0"><thead class="table-light"><tr><th style="min-width:220px">Taşınır</th><th>Miktar</th><th>Açıklama</th><th></th></tr></thead>
+                <tbody id="kalemBody"></tbody></table>
+        </div></div>
+    </div>
+</form>
+
+@section Scripts {
+<script>
+const opts = `@Html.Raw(string.Join("", tanimlar.Select(t => $"<option value='{t.Key}'>{System.Net.WebUtility.HtmlEncode(t.Value)}</option>")))`;
+function kalemEkle() {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><select name="tasinirIds" class="form-select form-select-sm">${opts}</select></td>
+        <td><input name="miktarlar" type="number" value="1" min="1" class="form-control form-control-sm" style="width:80px"/></td>
+        <td><input name="aciklamalar" class="form-control form-control-sm"/></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger py-0" onclick="this.closest('tr').remove()">×</button></td>`;
+    document.getElementById('kalemBody').appendChild(tr);
+}
+</script>
+}

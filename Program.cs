@@ -42,6 +42,9 @@ app.MapAreaControllerRoute("ihale", "Ihale", "ihale/{controller=Home}/{action=In
 app.MapAreaControllerRoute("kayit", "Kayit", "kayit/{controller=Home}/{action=Index}/{id?}");
 app.MapAreaControllerRoute("depo", "Depo", "depo/{controller=Home}/{action=Index}/{id?}");
 app.MapAreaControllerRoute("zimmet", "Zimmet", "zimmet/{controller=Home}/{action=Index}/{id?}");
+app.MapAreaControllerRoute("hurda", "Hurda", "hurda/{controller=Home}/{action=Index}/{id?}");
+app.MapAreaControllerRoute("sayim", "Sayim", "sayim/{controller=Home}/{action=Index}/{id?}");
+app.MapAreaControllerRoute("devir", "Devir", "devir/{controller=Home}/{action=Index}/{id?}");
 app.MapAreaControllerRoute("raporlama", "Raporlama", "raporlama/{controller=Home}/{action=Index}/{id?}");
 app.MapAreaControllerRoute("yonetim", "Yonetim", "yonetim/{controller=Home}/{action=Index}/{id?}");
 app.MapControllerRoute("default", "{controller=Dashboard}/{action=Index}/{id?}");
