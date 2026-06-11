@@ -131,8 +131,8 @@
                                 }
                             </td>
                             <td>@k.SicilNo</td>
-                            <td>
-                                <div>@k.Cinsi</div>
+                            <td data-tanim-id="@k.TasinirTanimId" data-urun-resim="@(k.ResimUrl)" data-urun-ad="@k.Cinsi" data-urun-alt="Sicil: @k.SicilNo">
+                                <div>@k.Cinsi @if (!string.IsNullOrEmpty(k.ResimUrl) || !string.IsNullOrEmpty(k.TasinirTanimId)) { <i class="bi bi-image text-muted small" title="Resim için üzerine gelin"></i> }</div>
                                 @if (!string.IsNullOrEmpty(k.Aciklama))
                                 { <div class="text-muted" style="font-size:.75rem;">@k.Aciklama</div> }
                             </td>

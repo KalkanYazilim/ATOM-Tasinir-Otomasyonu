@@ -205,6 +205,7 @@
                             var t = tanimlar.GetValueOrDefault(s.TasinirTanimId);
                             if (t?.DemirbasMi == true) { continue; }
                             <span class="chip sarf" draggable="true"
+                                  data-tanim-id="@s.TasinirTanimId" data-urun-resim="@(t?.ResimUrl)" data-urun-ad="@(t?.Ad)"
                                   ondragstart="surukleBasla(event,'sarf','@depo.Id','@s.TasinirTanimId','','@(t?.Ad)','@s.Miktar')">
                                 @if (!string.IsNullOrEmpty(t?.ResimUrl)) { <img src="@t.ResimUrl" class="chip-img"/> } else { <i class="bi bi-box"></i> }
                                 @TanimAd(s.TasinirTanimId) <b>×@s.Miktar</b>
@@ -219,6 +220,7 @@
                             {
                                 var t = tanimlar.GetValueOrDefault(k.TasinirTanimId ?? "");
                                 <span class="chip demirbas" draggable="true" title="@k.SicilNo"
+                                      data-tanim-id="@k.TasinirTanimId" data-urun-resim="@(k.ResimUrl ?? t?.ResimUrl)" data-urun-ad="@k.Cinsi" data-urun-alt="Sicil: @k.SicilNo"
                                       ondragstart="surukleBasla(event,'demirbas','@depo.Id','@(k.TasinirTanimId)','@k.Id','@k.Cinsi','1')">
                                     @if (!string.IsNullOrEmpty(k.ResimUrl ?? t?.ResimUrl)) { <img src="@(k.ResimUrl ?? t?.ResimUrl)" class="chip-img"/> } else { <i class="bi bi-cpu"></i> }
                                     @k.Cinsi <span class="text-muted">@k.SicilNo</span>

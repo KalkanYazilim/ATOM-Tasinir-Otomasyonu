@@ -1,0 +1,102 @@
+@model string
+@{
+    var json = string.IsNullOrEmpty(Model) ? "{}" : Model;
+}
+<div id="atomUrunOnizleme" aria-hidden="true">
+    <div class="aou-img-wrap">
+        <img id="aouImg" alt="" />
+        <div id="aouIkon" class="aou-ikon"><i class="bi bi-box-seam"></i></div>
+    </div>
+    <div id="aouAd" class="aou-ad"></div>
+    <div id="aouAlt" class="aou-alt"></div>
+</div>
+
+<style>
+    #atomUrunOnizleme {
+        position: fixed; z-index: 4000; display: none; pointer-events: none;
+        width: 220px; background: #fff; border-radius: .6rem; overflow: hidden;
+        box-shadow: 0 14px 38px rgba(15,28,50,.34), 0 4px 10px rgba(15,28,50,.18);
+        border: 1px solid #d8e0ea; transition: opacity .08s ease;
+    }
+    #atomUrunOnizleme .aou-img-wrap {
+        width: 100%; height: 150px; background: #f1f5fa;
+        display: flex; align-items: center; justify-content: center; overflow: hidden;
+    }
+    #atomUrunOnizleme #aouImg { max-width: 100%; max-height: 150px; object-fit: contain; display: none; }
+    #atomUrunOnizleme .aou-ikon { font-size: 3rem; color: #9fb3c8; }
+    #atomUrunOnizleme .aou-ad { font-weight: 600; font-size: .9rem; padding: .5rem .7rem .15rem; color: #1a3a6b; }
+    #atomUrunOnizleme .aou-alt { font-size: .74rem; color: #6c7a8a; padding: 0 .7rem .55rem; }
+    [data-tanim-id], [data-urun-resim] { cursor: help; }
+</style>
+
+<script>
+(function () {
+    window.ATOM_URUN = @Html.Raw(json);
+    const box = document.getElementById('atomUrunOnizleme');
+    const img = document.getElementById('aouImg');
+    const ikon = document.getElementById('aouIkon');
+    const adEl = document.getElementById('aouAd');
+    const altEl = document.getElementById('aouAlt');
+    const ikonlar = {
+        BilisimDonanim: 'bi-pc-display', BilisimYazilim: 'bi-cd', MobilYa: 'bi-archive',
+        Kirtasiye: 'bi-pencil', ElektrikliEv: 'bi-plug', Arac: 'bi-truck',
+        TibbiBekipman: 'bi-heart-pulse', GuvenlikSistemi: 'bi-shield-lock', Diger: 'bi-box-seam'
+    };
+
+    function konumla(x, y) {
+        const w = 220, h = box.offsetHeight || 210, pad = 18;
+        let nx = x + pad, ny = y + pad;
+        if (nx + w > window.innerWidth - 8) nx = x - w - pad;
+        if (ny + h > window.innerHeight - 8) ny = y - h - pad;
+        if (nx < 4) nx = 4;
+        if (ny < 4) ny = 4;
+        box.style.left = nx + 'px';
+        box.style.top = ny + 'px';
+    }
+
+    function goster(resim, ad, alt, kategori) {
+        if (resim) {
+            img.src = resim; img.style.display = 'block'; ikon.style.display = 'none';
+        } else {
+            img.style.display = 'none'; ikon.style.display = 'block';
+            ikon.innerHTML = '<i class="bi ' + (ikonlar[kategori] || 'bi-box-seam') + '"></i>';
+        }
+        adEl.textContent = ad || 'Ürün';
+        altEl.textContent = alt || (resim ? '' : 'Görsel yüklenmemiş');
+        box.style.display = 'block';
+    }
+
+    function veriCoz(el) {
+        let resim = el.getAttribute('data-urun-resim') || '';
+        let ad = el.getAttribute('data-urun-ad') || '';
+        let alt = el.getAttribute('data-urun-alt') || '';
+        let kategori = '';
+        const tid = el.getAttribute('data-tanim-id');
+        if (tid && window.ATOM_URUN[tid]) {
+            const u = window.ATOM_URUN[tid];
+            if (!resim) resim = u.resim || '';
+            if (!ad) ad = u.ad || '';
+            kategori = u.kategori || '';
+        }
+        if (!resim && !ad && !tid) return null;
+        return { resim, ad, alt, kategori };
+    }
+
+    document.addEventListener('mouseover', function (e) {
+        const el = e.target.closest('[data-tanim-id],[data-urun-resim]');
+        if (!el) return;
+        const v = veriCoz(el);
+        if (!v) return;
+        goster(v.resim, v.ad, v.alt, v.kategori);
+        konumla(e.clientX, e.clientY);
+    });
+    document.addEventListener('mousemove', function (e) {
+        if (box.style.display === 'block') konumla(e.clientX, e.clientY);
+    });
+    document.addEventListener('mouseout', function (e) {
+        const el = e.target.closest('[data-tanim-id],[data-urun-resim]');
+        if (el) box.style.display = 'none';
+    });
+    document.addEventListener('scroll', function () { box.style.display = 'none'; }, true);
+})();
+</script>

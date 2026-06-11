@@ -23,7 +23,7 @@
                 <tbody>
                     @foreach (var t in Model.OrderBy(x => x.Kod))
                     {
-                        <tr>
+                        <tr data-tanim-id="@t.Id" data-urun-resim="@t.ResimUrl" data-urun-ad="@t.Ad" data-urun-alt="@t.Kod">
                             <td>
                                 @if (!string.IsNullOrEmpty(t.ResimUrl))
                                 { <img src="@t.ResimUrl" class="rounded" style="width:38px;height:38px;object-fit:cover;"/> }

@@ -61,7 +61,9 @@
                             var tanim = tanimlar.TryGetValue(s.TasinirTanimId, out var t) ? t : null;
                             var kritik = s.MinEsik > 0 && s.Miktar <= s.MinEsik;
                             <tr class="@(kritik ? "table-danger" : "")">
-                                <td>@(tanim?.Ad ?? s.TasinirTanimId)
+                                <td data-tanim-id="@s.TasinirTanimId" data-urun-resim="@(tanim?.ResimUrl)" data-urun-ad="@(tanim?.Ad)">
+                                    @(tanim?.Ad ?? s.TasinirTanimId)
+                                    @if (!string.IsNullOrEmpty(tanim?.ResimUrl)) { <i class="bi bi-image text-muted small"></i> }
                                     @if (tanim?.DemirbasMi == true) { <span class="badge bg-secondary ms-1" style="font-size:.6rem;">Demirbaş</span> }
                                 </td>
                                 <td class="text-center fw-semibold">@s.Miktar @(tanim?.Birim ?? "")</td>
