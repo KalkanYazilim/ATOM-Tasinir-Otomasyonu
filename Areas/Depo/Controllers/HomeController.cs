@@ -29,6 +29,10 @@ public class HomeController : Controller
     private string Rol => User.FindFirstValue(ClaimTypes.Role)!;
     private string KurumId => User.FindFirstValue("KurumId")!;
     private string? Ip => HttpContext.Connection.RemoteIpAddress?.ToString();
+    private bool Bakanlik => AtomRoller.BakanlikRolleri.Contains(Rol);
+    private bool YetkiliDepo(ATOM.Models.Domain.Depo depo) => Bakanlik || depo.KurumId == KurumId;
+    private bool YetkiliPersonel(AtomKullanici personel) =>
+        personel.AktifMi && personel.Rol == AtomRoller.Personel && (Bakanlik || personel.KurumId == KurumId);
 
     // ─── Depo Listesi ──────────────────────────────────────────
     public async Task<IActionResult> Index()
@@ -37,7 +41,7 @@ public class HomeController : Controller
         var kurumlar = await _svc.KurumlariGetirAsync();
         var tanimlar = await _svc.TasinirTanimlariGetirAsync();
 
-        if (!AtomRoller.BakanlikRolleri.Contains(Rol))
+        if (!Bakanlik)
             depolar = depolar.Where(d => d.KurumId == KurumId).ToList();
 
         ViewBag.Kurumlar = kurumlar.ToDictionary(k => k.Id, k => k.Ad);
@@ -50,7 +54,7 @@ public class HomeController : Controller
     {
         var depo = await _svc.DepoGetirAsync(id);
         if (depo == null) return NotFound();
-        if (!AtomRoller.BakanlikRolleri.Contains(Rol) && depo.KurumId != KurumId) return Forbid();
+        if (!YetkiliDepo(depo)) return Forbid();
 
         var tanimlar = await _svc.TasinirTanimlariGetirAsync();
         ViewBag.Tanimlar = tanimlar.ToDictionary(t => t.Id, t => t);
@@ -64,6 +68,8 @@ public class HomeController : Controller
         if (mk == null) return NotFound();
         var tanimlar = await _svc.TasinirTanimlariGetirAsync();
         var depo = await _svc.DepoGetirAsync(mk.DepoId);
+        if (depo == null) return NotFound();
+        if (!YetkiliDepo(depo)) return Forbid();
         var basliklar = new List<string> { "S.No", "Taşınır", "Sipariş", "Teslim", "Kabul", "Red", "Birim Fiyat", "Tutar" };
         int sira = 0;
         var satirlar = mk.Kalemler.Select(k => (IList<string>)new List<string>
@@ -83,6 +89,9 @@ public class HomeController : Controller
     {
         var mk = await _svc.MalKabulGetirAsync(id);
         if (mk == null) return NotFound();
+        var depo = await _svc.DepoGetirAsync(mk.DepoId);
+        if (depo == null) return NotFound();
+        if (!YetkiliDepo(depo)) return Forbid();
         var tanimlar = await _svc.TasinirTanimlariGetirAsync();
         var firma = (await _svc.FirmalariGetirAsync()).FirstOrDefault(f => f.Id == mk.FirmaId);
         var basliklar = new List<string> { "S.No", "Taşınır", "Sipariş", "Teslim", "Kabul", "Red", "Red Gerekçe" };
@@ -104,6 +113,9 @@ public class HomeController : Controller
         if (sevk == null) return NotFound();
         var tanimlar = await _svc.TasinirTanimlariGetirAsync();
         var depolar = await _svc.DepolariGetirAsync();
+        var kaynakDepo = depolar.FirstOrDefault(d => d.Id == sevk.KaynakDepoId);
+        var hedefDepo = depolar.FirstOrDefault(d => d.Id == sevk.HedefDepoId);
+        if ((kaynakDepo == null || !YetkiliDepo(kaynakDepo)) && (hedefDepo == null || !YetkiliDepo(hedefDepo))) return Forbid();
         var kaynak = depolar.FirstOrDefault(d => d.Id == sevk.KaynakDepoId)?.Ad;
         var hedef = depolar.FirstOrDefault(d => d.Id == sevk.HedefDepoId)?.Ad;
         var basliklar = new List<string> { "S.No", "Taşınır", "Miktar", "Teslim Alınan" };
@@ -126,8 +138,14 @@ public class HomeController : Controller
     {
         var depolar = await _svc.DepolariGetirAsync();
         var tanimlar = await _svc.TasinirTanimlariGetirAsync();
-        if (!AtomRoller.BakanlikRolleri.Contains(Rol)) depolar = depolar.Where(d => d.KurumId == KurumId).ToList();
+        var kullanicilar = await _svc.KullanicilariGetirAsync();
+        if (!Bakanlik)
+        {
+            depolar = depolar.Where(d => d.KurumId == KurumId).ToList();
+            kullanicilar = kullanicilar.Where(k => k.KurumId == KurumId).ToList();
+        }
         ViewBag.Depolar = depolar;
+        ViewBag.Personeller = kullanicilar.Where(k => k.AktifMi && k.Rol == AtomRoller.Personel).ToList();
         // Sadece sarf (demirbaş olmayan) tanımlar
         ViewBag.SarfTanimlar = tanimlar.Where(t => !t.DemirbasMi && t.AktifMi).ToList();
         return View();
@@ -136,11 +154,17 @@ public class HomeController : Controller
     [HttpPost]
     [Authorize(Roles = $"{AtomRoller.MerkezDepoSorumlusu},{AtomRoller.IlDepoSorumlusu},{AtomRoller.IlMuduru},{AtomRoller.SistemAdmin}")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> TuketimCikisi(string depoId, string tanimId, int miktar, string birim, string kullanimYeri)
+    public async Task<IActionResult> TuketimCikisi(string depoId, string tanimId, int miktar, string birim, string kullanimYeri, string? personelId)
     {
         var depo = await _svc.DepoGetirAsync(depoId);
         if (depo == null) { TempData["Hata"] = "Depo bulunamadı."; return RedirectToAction(nameof(TuketimCikisi)); }
-        if (!AtomRoller.BakanlikRolleri.Contains(Rol) && depo.KurumId != KurumId) return Forbid();
+        if (!YetkiliDepo(depo)) return Forbid();
+        AtomKullanici? personel = null;
+        if (!string.IsNullOrWhiteSpace(personelId))
+        {
+            personel = await _svc.KullaniciGetirAsync(personelId);
+            if (personel == null || !YetkiliPersonel(personel)) return Forbid();
+        }
 
         var mevcut = await _stok.MevcutStokAsync(depoId, tanimId);
         if (mevcut < miktar)
@@ -151,13 +175,31 @@ public class HomeController : Controller
         }
 
         var belgeNo = await _svc.YeniNumaraUretAsync("TKT");
-        await _stok.CikisYapAsync(new StokHareketIstegi
+        if (personel != null)
         {
-            DepoId = depoId, TasinirTanimId = tanimId, Miktar = miktar, IslemTuru = StokIslemTuru.TuketimCikisi,
-            KaynakBelgeTur = "Tüketim", KaynakBelgeId = belgeNo, KaynakBelgeNo = belgeNo,
-            KullaniciId = KullaniciId, KullaniciAdi = AdSoyad,
-            Aciklama = $"Tüketim çıkışı — Birim: {birim}, Kullanım: {kullanimYeri}"
-        });
+            await _stok.PersonelSarfVerAsync(new PersonelSarfIstegi
+            {
+                PersonelId = personel.Id,
+                KurumId = personel.KurumId,
+                KaynakDepoId = depoId,
+                TasinirTanimId = tanimId,
+                Miktar = miktar,
+                KaynakBelgeNo = belgeNo,
+                KullaniciId = KullaniciId,
+                KullaniciAdi = AdSoyad,
+                Aciklama = $"Personel sarf teslimi — Birim: {birim}, Kullanım: {kullanimYeri}, Personel: {personel.AdSoyad}"
+            });
+        }
+        else
+        {
+            await _stok.CikisYapAsync(new StokHareketIstegi
+            {
+                DepoId = depoId, TasinirTanimId = tanimId, Miktar = miktar, IslemTuru = StokIslemTuru.TuketimCikisi,
+                KaynakBelgeTur = "Tüketim", KaynakBelgeId = belgeNo, KaynakBelgeNo = belgeNo,
+                KullaniciId = KullaniciId, KullaniciAdi = AdSoyad,
+                Aciklama = $"Tüketim çıkışı — Birim: {birim}, Kullanım: {kullanimYeri}"
+            });
+        }
         await _audit.KaydetAsync(User, "Tüketim", "Çıkış", "StokHareket", belgeNo, $"{belgeNo} tüketim çıkışı ({miktar} adet)", ip: Ip);
         TempData["Basari"] = $"{belgeNo} numaralı tüketim çıkışı yapıldı, stok düşüldü.";
         return RedirectToAction(nameof(TuketimCikisi));
@@ -168,7 +210,7 @@ public class HomeController : Controller
     {
         var depo = await _svc.DepoGetirAsync(depoId);
         if (depo == null) return NotFound();
-        if (!AtomRoller.BakanlikRolleri.Contains(Rol) && depo.KurumId != KurumId) return Forbid();
+        if (!YetkiliDepo(depo)) return Forbid();
 
         var hareketler = (await _svc.StokHareketleriGetirAsync())
             .Where(h => h.DepoId == depoId && h.TasinirTanimId == tanimId)
@@ -190,7 +232,7 @@ public class HomeController : Controller
         var firmalar = await _svc.FirmalariGetirAsync();
         var depolar = await _svc.DepolariGetirAsync();
 
-        if (!AtomRoller.BakanlikRolleri.Contains(Rol))
+        if (!Bakanlik)
         {
             var kurumDepolar = depolar.Where(d => d.KurumId == KurumId).Select(d => d.Id).ToHashSet();
             malKabuller = malKabuller.Where(mk => kurumDepolar.Contains(mk.DepoId)).ToList();
@@ -211,7 +253,7 @@ public class HomeController : Controller
         var depolar = await _svc.DepolariGetirAsync();
         var tanimlar = await _svc.TasinirTanimlariGetirAsync();
 
-        if (!AtomRoller.BakanlikRolleri.Contains(Rol))
+        if (!Bakanlik)
             depolar = depolar.Where(d => d.KurumId == KurumId).ToList();
 
         ViewBag.Ihaleler = ihaleler;
@@ -243,6 +285,10 @@ public class HomeController : Controller
         string[] tasinirIds, int[] siparisEdilen, int[] teslimEdilen, int[] kabulEdilen,
         decimal[] birimFiyatlar, string[] seriNolar, string[] markalar, string[] modeller)
     {
+        var depo = await _svc.DepoGetirAsync(mk.DepoId);
+        if (depo == null) { TempData["Hata"] = "Depo bulunamadı."; return RedirectToAction(nameof(YeniMalKabul)); }
+        if (!YetkiliDepo(depo)) return Forbid();
+
         mk.MalKabulNo = await _svc.YeniNumaraUretAsync("MK");
         mk.KabulEdenKullaniciId = KullaniciId;
         mk.TeslimTarihi = DateTime.UtcNow;
@@ -276,6 +322,9 @@ public class HomeController : Controller
     {
         var mk = await _svc.MalKabulGetirAsync(id);
         if (mk == null) return NotFound();
+        var depo = await _svc.DepoGetirAsync(mk.DepoId);
+        if (depo == null) return NotFound();
+        if (!YetkiliDepo(depo)) return Forbid();
 
         mk.Durum = onayla ? OnayDurumu.Onaylandi : OnayDurumu.Reddedildi;
         mk.OnayGecmisi.Add(new OnayKaydi
@@ -336,7 +385,7 @@ public class HomeController : Controller
         var depolar = await _svc.DepolariGetirAsync();
         var kurumlar = await _svc.KurumlariGetirAsync();
 
-        if (!AtomRoller.BakanlikRolleri.Contains(Rol))
+        if (!Bakanlik)
         {
             var kurumDepolar = depolar.Where(d => d.KurumId == KurumId).Select(d => d.Id).ToHashSet();
             sevkler = sevkler.Where(s => kurumDepolar.Contains(s.KaynakDepoId) || kurumDepolar.Contains(s.HedefDepoId)).ToList();
@@ -354,6 +403,7 @@ public class HomeController : Controller
         var depolar = await _svc.DepolariGetirAsync();
         var tanimlar = await _svc.TasinirTanimlariGetirAsync();
         var kurumlar = await _svc.KurumlariGetirAsync();
+        if (!Bakanlik) depolar = depolar.Where(d => d.KurumId == KurumId).ToList();
         ViewBag.Depolar = depolar;
         ViewBag.Tanimlar = tanimlar.ToDictionary(t => t.Id, t => t.Ad);
         ViewBag.Kurumlar = kurumlar.ToDictionary(k => k.Id, k => k.Ad);
@@ -364,6 +414,15 @@ public class HomeController : Controller
     [Authorize(Roles = $"{AtomRoller.MerkezDepoSorumlusu},{AtomRoller.BakanlikMerkez},{AtomRoller.SistemAdmin}")]
     public async Task<IActionResult> YeniSevk(Sevk sevk, string[] tasinirIds, int[] miktarlar)
     {
+        var kaynakDepo = await _svc.DepoGetirAsync(sevk.KaynakDepoId);
+        var hedefDepo = await _svc.DepoGetirAsync(sevk.HedefDepoId);
+        if (kaynakDepo == null || hedefDepo == null)
+        {
+            TempData["Hata"] = "Kaynak veya hedef depo bulunamadı.";
+            return RedirectToAction(nameof(YeniSevk));
+        }
+        if (!YetkiliDepo(kaynakDepo) || !YetkiliDepo(hedefDepo)) return Forbid();
+
         sevk.OlusturanKullaniciId = KullaniciId;
         sevk.SevkTarihi = DateTime.UtcNow;
         sevk.Durum = SevkDurumu.Hazirlaniyor;
@@ -419,6 +478,9 @@ public class HomeController : Controller
     {
         var sevk = await _svc.SevkGetirAsync(id);
         if (sevk == null) return NotFound();
+        var hedefDepo = await _svc.DepoGetirAsync(sevk.HedefDepoId);
+        if (hedefDepo == null) return NotFound();
+        if (!YetkiliDepo(hedefDepo)) return Forbid();
 
         sevk.Durum = SevkDurumu.TeslimEdildi;
         sevk.GercekVarisTarihi = DateTime.UtcNow;
@@ -448,4 +510,3 @@ public class HomeController : Controller
         return RedirectToAction(nameof(Sevkler));
     }
 }
-

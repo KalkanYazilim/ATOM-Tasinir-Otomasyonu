@@ -52,6 +52,7 @@ app.MapAreaControllerRoute("hurda", "Hurda", "hurda/{controller=Home}/{action=In
 app.MapAreaControllerRoute("sayim", "Sayim", "sayim/{controller=Home}/{action=Index}/{id?}");
 app.MapAreaControllerRoute("devir", "Devir", "devir/{controller=Home}/{action=Index}/{id?}");
 app.MapAreaControllerRoute("tasit", "Tasit", "tasit/{controller=Home}/{action=Index}/{id?}");
+app.MapAreaControllerRoute("edinim", "Edinim", "edinim/{controller=Giris}/{action=Index}/{id?}");
 app.MapAreaControllerRoute("raporlama", "Raporlama", "raporlama/{controller=Home}/{action=Index}/{id?}");
 app.MapAreaControllerRoute("yonetim", "Yonetim", "yonetim/{controller=Home}/{action=Index}/{id?}");
 app.MapControllerRoute("default", "{controller=Dashboard}/{action=Index}/{id?}");

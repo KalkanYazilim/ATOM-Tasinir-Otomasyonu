@@ -17,6 +17,9 @@ public interface IStokService
 
     /// <summary>Kritik eşik altındaki kalemler için bildirim üretir.</summary>
     Task KritikStokKontrolAsync(string depoId, string tasinirTanimId);
+
+    Task PersonelSarfVerAsync(PersonelSarfIstegi istek);
+    Task PersonelSarfDusAsync(PersonelSarfIstegi istek);
 }
 
 public class StokHareketIstegi
@@ -38,6 +41,19 @@ public class StokHareketIstegi
 public class StokYetersizException : Exception
 {
     public StokYetersizException(string mesaj) : base(mesaj) { }
+}
+
+public class PersonelSarfIstegi
+{
+    public string PersonelId { get; set; } = "";
+    public string KurumId { get; set; } = "";
+    public string KaynakDepoId { get; set; } = "";
+    public string TasinirTanimId { get; set; } = "";
+    public int Miktar { get; set; }
+    public string KaynakBelgeNo { get; set; } = "";
+    public string KullaniciId { get; set; } = "";
+    public string KullaniciAdi { get; set; } = "";
+    public string Aciklama { get; set; } = "";
 }
 
 public class StokService : IStokService
@@ -95,6 +111,100 @@ public class StokService : IStokService
             $"{depo.Ad} deposunda '{tanim?.Ad}' kritik eşiğin altına düştü (kalan {stok.Miktar}, eşik {stok.MinEsik}).",
             BildirimTur.Uyari, $"/depo/Home/Detay/{depo.Id}", depo.Id, "Depo", "Yüksek",
             new[] { AtomRoller.MerkezDepoSorumlusu, AtomRoller.IlDepoSorumlusu, AtomRoller.IlMuduru });
+    }
+
+    public async Task PersonelSarfVerAsync(PersonelSarfIstegi istek)
+    {
+        if (istek.Miktar <= 0) return;
+
+        await CikisYapAsync(new StokHareketIstegi
+        {
+            DepoId = istek.KaynakDepoId,
+            TasinirTanimId = istek.TasinirTanimId,
+            Miktar = istek.Miktar,
+            IslemTuru = StokIslemTuru.PersonelSarfVerme,
+            KaynakBelgeTur = "PersonelSarf",
+            KaynakBelgeId = istek.KaynakBelgeNo,
+            KaynakBelgeNo = istek.KaynakBelgeNo,
+            KullaniciId = istek.KullaniciId,
+            KullaniciAdi = istek.KullaniciAdi,
+            Aciklama = istek.Aciklama
+        });
+
+        var kalan = await PersonelSarfBakiyeGuncelleAsync(istek, istek.Miktar);
+        await _data.PersonelSarfHareketKaydetAsync(new PersonelSarfHareket
+        {
+            HareketNo = await _data.YeniNumaraUretAsync("PSH"),
+            PersonelId = istek.PersonelId,
+            KurumId = istek.KurumId,
+            KaynakDepoId = istek.KaynakDepoId,
+            TasinirTanimId = istek.TasinirTanimId,
+            IslemTuru = PersonelSarfIslemTuru.Verme,
+            GirisMiktar = istek.Miktar,
+            KalanMiktar = kalan,
+            KaynakBelgeNo = istek.KaynakBelgeNo,
+            KullaniciId = istek.KullaniciId,
+            KullaniciAdi = istek.KullaniciAdi,
+            Aciklama = istek.Aciklama
+        });
+    }
+
+    public async Task PersonelSarfDusAsync(PersonelSarfIstegi istek)
+    {
+        if (istek.Miktar <= 0) return;
+        var bakiye = await PersonelSarfBakiyesiAsync(istek.PersonelId, istek.TasinirTanimId, istek.KaynakDepoId);
+        if (bakiye < istek.Miktar)
+        {
+            var tanim = await _data.TasinirTanimGetirAsync(istek.TasinirTanimId);
+            throw new StokYetersizException(
+                $"Personel sarf bakiyesi yetersiz: '{tanim?.Ad ?? istek.TasinirTanimId}' için mevcut {bakiye}, istenen {istek.Miktar}.");
+        }
+
+        var kalan = await PersonelSarfBakiyeGuncelleAsync(istek, -istek.Miktar);
+        await _data.PersonelSarfHareketKaydetAsync(new PersonelSarfHareket
+        {
+            HareketNo = await _data.YeniNumaraUretAsync("PSH"),
+            PersonelId = istek.PersonelId,
+            KurumId = istek.KurumId,
+            KaynakDepoId = istek.KaynakDepoId,
+            TasinirTanimId = istek.TasinirTanimId,
+            IslemTuru = PersonelSarfIslemTuru.TuketimDusum,
+            CikisMiktar = istek.Miktar,
+            KalanMiktar = kalan,
+            KaynakBelgeNo = istek.KaynakBelgeNo,
+            KullaniciId = istek.KullaniciId,
+            KullaniciAdi = istek.KullaniciAdi,
+            Aciklama = istek.Aciklama
+        });
+    }
+
+    private async Task<int> PersonelSarfBakiyesiAsync(string personelId, string tanimId, string kaynakDepoId)
+    {
+        var bakiyeler = await _data.PersonelSarfBakiyeleriGetirAsync();
+        return bakiyeler.FirstOrDefault(b =>
+            b.PersonelId == personelId && b.TasinirTanimId == tanimId && b.KaynakDepoId == kaynakDepoId)?.Miktar ?? 0;
+    }
+
+    private async Task<int> PersonelSarfBakiyeGuncelleAsync(PersonelSarfIstegi istek, int delta)
+    {
+        var bakiyeler = await _data.PersonelSarfBakiyeleriGetirAsync();
+        var bakiye = bakiyeler.FirstOrDefault(b =>
+            b.PersonelId == istek.PersonelId && b.TasinirTanimId == istek.TasinirTanimId && b.KaynakDepoId == istek.KaynakDepoId);
+        if (bakiye == null)
+        {
+            bakiye = new PersonelSarfBakiye
+            {
+                PersonelId = istek.PersonelId,
+                KurumId = istek.KurumId,
+                KaynakDepoId = istek.KaynakDepoId,
+                TasinirTanimId = istek.TasinirTanimId
+            };
+        }
+
+        bakiye.Miktar = Math.Max(0, bakiye.Miktar + delta);
+        bakiye.SonGuncelleme = DateTime.UtcNow;
+        await _data.PersonelSarfBakiyeKaydetAsync(bakiye);
+        return bakiye.Miktar;
     }
 
     private async Task HareketKaydet(StokHareketIstegi istek, int giris, int cikis, int kalan)

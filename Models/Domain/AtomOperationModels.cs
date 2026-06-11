@@ -8,7 +8,7 @@ public enum StokIslemTuru
 {
     SatinAlmaGirisi, DevirGirisi, BagisGirisi, SayimFazlasi,
     SevkCikisi, SevkGirisi, ZimmetCikisi, ZimmetIadesi,
-    HurdaDusum, Kayip, BakimCikisi, BakimDonusu, Duzeltme, AcilisGirisi, TuketimCikisi
+    HurdaDusum, Kayip, BakimCikisi, BakimDonusu, Duzeltme, AcilisGirisi, TuketimCikisi, PersonelSarfVerme, PersonelSarfDusum
 }
 
 public class StokHareket
@@ -49,8 +49,46 @@ public class StokHareket
         StokIslemTuru.Duzeltme => "Düzeltme",
         StokIslemTuru.AcilisGirisi => "Açılış Girişi",
         StokIslemTuru.TuketimCikisi => "Tüketim Çıkışı",
+        StokIslemTuru.PersonelSarfVerme => "Personel Sarf Verme",
+        StokIslemTuru.PersonelSarfDusum => "Personel Sarf Düşüm",
         _ => t.ToString()
     };
+}
+
+// ═════════════════════════════════════════════════════════════
+// PERSONEL SARF İZLEME — sarf malzeme son kullanıcıya kadar takip
+// ═════════════════════════════════════════════════════════════
+
+public enum PersonelSarfIslemTuru { Verme, TuketimDusum, Iade, Duzeltme }
+
+public class PersonelSarfBakiye
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string PersonelId { get; set; } = "";
+    public string KurumId { get; set; } = "";
+    public string KaynakDepoId { get; set; } = "";
+    public string TasinirTanimId { get; set; } = "";
+    public int Miktar { get; set; }
+    public DateTime SonGuncelleme { get; set; } = DateTime.UtcNow;
+}
+
+public class PersonelSarfHareket
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string HareketNo { get; set; } = "";
+    public string PersonelId { get; set; } = "";
+    public string KurumId { get; set; } = "";
+    public string KaynakDepoId { get; set; } = "";
+    public string TasinirTanimId { get; set; } = "";
+    public PersonelSarfIslemTuru IslemTuru { get; set; }
+    public int GirisMiktar { get; set; }
+    public int CikisMiktar { get; set; }
+    public int KalanMiktar { get; set; }
+    public string KaynakBelgeNo { get; set; } = "";
+    public string KullaniciId { get; set; } = "";
+    public string KullaniciAdi { get; set; } = "";
+    public string Aciklama { get; set; } = "";
+    public DateTime Tarih { get; set; } = DateTime.UtcNow;
 }
 
 // ═════════════════════════════════════════════════════════════

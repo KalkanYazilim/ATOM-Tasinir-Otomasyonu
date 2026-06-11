@@ -13,15 +13,16 @@ public class HomeController : Controller
 {
     private readonly IAtomDataService _svc;
     private readonly ITasinirKayitService _kayit;
+    private readonly IStokService _stok;
     private readonly IBildirimService _bildirim;
     private readonly IAuditService _audit;
     private readonly IImzaService _imza;
     private readonly BelgeService _belge;
 
-    public HomeController(IAtomDataService svc, ITasinirKayitService kayit,
+    public HomeController(IAtomDataService svc, ITasinirKayitService kayit, IStokService stok,
         IBildirimService bildirim, IAuditService audit, IImzaService imza, BelgeService belge)
     {
-        _svc = svc; _kayit = kayit; _bildirim = bildirim; _audit = audit; _imza = imza; _belge = belge;
+        _svc = svc; _kayit = kayit; _stok = stok; _bildirim = bildirim; _audit = audit; _imza = imza; _belge = belge;
     }
 
     private string KullaniciId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
@@ -30,7 +31,16 @@ public class HomeController : Controller
     private string KurumId => User.FindFirstValue("KurumId")!;
     private string? Ip => HttpContext.Connection.RemoteIpAddress?.ToString();
 
-    private bool YetkiliKurum(string kurumId) => AtomRoller.BakanlikRolleri.Contains(Rol) || kurumId == KurumId;
+    private bool Bakanlik => AtomRoller.BakanlikRolleri.Contains(Rol);
+    private bool YetkiliKurum(string kurumId) => Bakanlik || kurumId == KurumId;
+    private async Task<bool> ZimmeteYetkiliMi(ATOM.Models.Domain.Zimmet zimmet)
+    {
+        if (Rol == AtomRoller.Personel) return zimmet.PersonelId == KullaniciId;
+        var depo = await _svc.DepoGetirAsync(zimmet.DepoId);
+        return depo != null && YetkiliKurum(depo.KurumId);
+    }
+    private bool YetkiliPersonel(AtomKullanici personel) =>
+        personel.AktifMi && personel.Rol == AtomRoller.Personel && YetkiliKurum(personel.KurumId);
 
     public async Task<IActionResult> Index(string? ara = null, string? durum = null)
     {
@@ -41,7 +51,7 @@ public class HomeController : Controller
 
         if (Rol == AtomRoller.Personel)
             zimmetler = zimmetler.Where(z => z.PersonelId == KullaniciId).ToList();
-        else if (!AtomRoller.BakanlikRolleri.Contains(Rol))
+        else if (!Bakanlik)
         {
             var kurumDepolar = depolar.Where(d => d.KurumId == KurumId).Select(d => d.Id).ToHashSet();
             zimmetler = zimmetler.Where(z => kurumDepolar.Contains(z.DepoId)).ToList();
@@ -59,6 +69,57 @@ public class HomeController : Controller
         return View(zimmetler.OrderByDescending(z => z.ZimmetTarihi).ToList());
     }
 
+    public async Task<IActionResult> Sarf()
+    {
+        var bakiyeler = await _svc.PersonelSarfBakiyeleriGetirAsync();
+        var kullanicilar = await _svc.KullanicilariGetirAsync();
+        var depolar = await _svc.DepolariGetirAsync();
+        var tanimlar = await _svc.TasinirTanimlariGetirAsync();
+
+        if (Rol == AtomRoller.Personel)
+            bakiyeler = bakiyeler.Where(b => b.PersonelId == KullaniciId).ToList();
+        else if (!Bakanlik)
+            bakiyeler = bakiyeler.Where(b => b.KurumId == KurumId).ToList();
+
+        ViewBag.Kullanicilar = kullanicilar.ToDictionary(k => k.Id, k => k.AdSoyad);
+        ViewBag.Depolar = depolar.ToDictionary(d => d.Id, d => d.Ad);
+        ViewBag.Tanimlar = tanimlar.ToDictionary(t => t.Id, t => t);
+        return View(bakiyeler.Where(b => b.Miktar > 0).OrderByDescending(b => b.SonGuncelleme).ToList());
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SarfDus(string bakiyeId, int miktar, string aciklama)
+    {
+        var bakiye = (await _svc.PersonelSarfBakiyeleriGetirAsync()).FirstOrDefault(b => b.Id == bakiyeId);
+        if (bakiye == null) return NotFound();
+        if (Rol == AtomRoller.Personel && bakiye.PersonelId != KullaniciId) return Forbid();
+        if (Rol != AtomRoller.Personel && !YetkiliKurum(bakiye.KurumId)) return Forbid();
+        if (miktar <= 0 || miktar > bakiye.Miktar)
+        {
+            TempData["Hata"] = "Düşüm miktarı geçersiz.";
+            return RedirectToAction(nameof(Sarf));
+        }
+
+        var belgeNo = await _svc.YeniNumaraUretAsync("PSD");
+        await _stok.PersonelSarfDusAsync(new PersonelSarfIstegi
+        {
+            PersonelId = bakiye.PersonelId,
+            KurumId = bakiye.KurumId,
+            KaynakDepoId = bakiye.KaynakDepoId,
+            TasinirTanimId = bakiye.TasinirTanimId,
+            Miktar = miktar,
+            KaynakBelgeNo = belgeNo,
+            KullaniciId = KullaniciId,
+            KullaniciAdi = AdSoyad,
+            Aciklama = string.IsNullOrWhiteSpace(aciklama) ? "Son kullanıcı tüketim düşümü." : aciklama
+        });
+        await _audit.KaydetAsync(User, "PersonelSarf", "Düşüm", "PersonelSarfBakiye", bakiye.Id,
+            $"{belgeNo} personel sarf düşümü ({miktar} adet)", ip: Ip);
+        TempData["Basari"] = $"{belgeNo} numaralı sarf düşümü kaydedildi.";
+        return RedirectToAction(nameof(Sarf));
+    }
+
     [HttpGet]
     [Authorize(Roles = $"{AtomRoller.IlDepoSorumlusu},{AtomRoller.MerkezDepoSorumlusu},{AtomRoller.IlMuduru},{AtomRoller.SistemAdmin}")]
     public async Task<IActionResult> Yeni()
@@ -68,7 +129,7 @@ public class HomeController : Controller
         var tanimlar = await _svc.TasinirTanimlariGetirAsync();
         var kayitlar = await _svc.TasinirKayitlariGetirAsync();
 
-        if (!AtomRoller.BakanlikRolleri.Contains(Rol))
+        if (!Bakanlik)
         {
             depolar = depolar.Where(d => d.KurumId == KurumId).ToList();
             kullanicilar = kullanicilar.Where(k => k.KurumId == KurumId).ToList();
@@ -80,7 +141,7 @@ public class HomeController : Controller
             .Where(k => k.Durum == TasinirKayitDurumu.Ambarda && k.DepoId != null && depoIds.Contains(k.DepoId))
             .OrderBy(k => k.Cinsi).ToList();
         ViewBag.Depolar = depolar;
-        ViewBag.Kullanicilar = kullanicilar.Where(k => k.AktifMi).ToList();
+        ViewBag.Kullanicilar = kullanicilar.Where(k => k.AktifMi && k.Rol == AtomRoller.Personel).ToList();
         ViewBag.Tanimlar = tanimlar.ToDictionary(t => t.Id, t => t.Ad);
         return View(new ATOM.Models.Domain.Zimmet { DepoId = depolar.FirstOrDefault()?.Id ?? "" });
     }
@@ -95,6 +156,19 @@ public class HomeController : Controller
             TempData["Hata"] = "En az bir taşınır seçmelisiniz.";
             return RedirectToAction(nameof(Yeni));
         }
+        var depo = await _svc.DepoGetirAsync(zimmet.DepoId);
+        var personel = await _svc.KullaniciGetirAsync(zimmet.PersonelId);
+        if (depo == null)
+        {
+            TempData["Hata"] = "Depo bulunamadı.";
+            return RedirectToAction(nameof(Yeni));
+        }
+        if (!YetkiliKurum(depo.KurumId)) return Forbid();
+        if (personel == null || !YetkiliPersonel(personel))
+        {
+            TempData["Hata"] = "Bu personele zimmet verme yetkiniz yok.";
+            return RedirectToAction(nameof(Yeni));
+        }
 
         zimmet.ZimmetNo = await _svc.YeniNumaraUretAsync("ZMT");
         zimmet.VerenKullaniciId = KullaniciId;
@@ -106,6 +180,7 @@ public class HomeController : Controller
         {
             var k = await _svc.TasinirKayitGetirAsync(kayitId);
             if (k == null || k.Durum != TasinirKayitDurumu.Ambarda) continue;
+            if (k.DepoId != zimmet.DepoId || string.IsNullOrWhiteSpace(k.KurumId) || !YetkiliKurum(k.KurumId)) continue;
 
             zimmet.Kalemler.Add(new ZimmetKalemi
             {
@@ -148,7 +223,7 @@ public class HomeController : Controller
     {
         var zimmet = await _svc.ZimmetGetirAsync(id);
         if (zimmet == null) return NotFound();
-        if (Rol == AtomRoller.Personel && zimmet.PersonelId != KullaniciId) return Forbid();
+        if (!await ZimmeteYetkiliMi(zimmet)) return Forbid();
 
         var tanimlar = await _svc.TasinirTanimlariGetirAsync();
         var kullanicilar = await _svc.KullanicilariGetirAsync();
@@ -165,9 +240,9 @@ public class HomeController : Controller
     {
         var zimmet = await _svc.ZimmetGetirAsync(id);
         if (zimmet == null) return NotFound();
-        if (zimmet.PersonelId != KullaniciId &&
-            !new[] { AtomRoller.IlMuduru, AtomRoller.IlDepoSorumlusu, AtomRoller.MerkezDepoSorumlusu, AtomRoller.SistemAdmin }.Contains(Rol))
-            return Forbid();
+        var iadeRolYetkili = new[] { AtomRoller.IlMuduru, AtomRoller.IlDepoSorumlusu, AtomRoller.MerkezDepoSorumlusu, AtomRoller.SistemAdmin, AtomRoller.BakanlikMerkez }.Contains(Rol);
+        if (zimmet.PersonelId != KullaniciId && !iadeRolYetkili) return Forbid();
+        if (!await ZimmeteYetkiliMi(zimmet)) return Forbid();
 
         zimmet.Durum = ZimmetDurumu.Iade;
         zimmet.IadeTarihi = DateTime.UtcNow;
@@ -207,7 +282,7 @@ public class HomeController : Controller
     {
         var zimmet = await _svc.ZimmetGetirAsync(id);
         if (zimmet == null) return NotFound();
-        if (Rol == AtomRoller.Personel && zimmet.PersonelId != KullaniciId) return Forbid();
+        if (!await ZimmeteYetkiliMi(zimmet)) return Forbid();
 
         var kullanicilar = await _svc.KullanicilariGetirAsync();
         var depolar = await _svc.DepolariGetirAsync();
@@ -236,7 +311,7 @@ public class HomeController : Controller
     {
         var zimmet = await _svc.ZimmetGetirAsync(id);
         if (zimmet == null) return NotFound();
-        if (Rol == AtomRoller.Personel && zimmet.PersonelId != KullaniciId) return Forbid();
+        if (!await ZimmeteYetkiliMi(zimmet)) return Forbid();
         var kullanicilar = await _svc.KullanicilariGetirAsync();
         var personel = kullanicilar.FirstOrDefault(k => k.Id == zimmet.PersonelId);
 
@@ -259,7 +334,7 @@ public class HomeController : Controller
     {
         var zimmet = await _svc.ZimmetGetirAsync(id);
         if (zimmet == null) return NotFound();
-        if (Rol == AtomRoller.Personel && zimmet.PersonelId != KullaniciId) return Forbid();
+        if (!await ZimmeteYetkiliMi(zimmet)) return Forbid();
         if (zimmet.Durum != ZimmetDurumu.Iade)
         {
             TempData["Hata"] = "İade fişi yalnızca iade edilmiş zimmetler için üretilebilir.";
@@ -311,11 +386,25 @@ public class HomeController : Controller
 
         if (Rol == AtomRoller.Personel)
             bakimlar = bakimlar.Where(b => b.PersonelId == KullaniciId).ToList();
+        else if (!Bakanlik)
+        {
+            var yetkiliPersonelIds = kullanicilar
+                .Where(k => k.KurumId == KurumId)
+                .Select(k => k.Id)
+                .ToHashSet();
+            bakimlar = bakimlar.Where(b => yetkiliPersonelIds.Contains(b.PersonelId)).ToList();
+        }
 
         ViewBag.Tanimlar = tanimlar.ToDictionary(t => t.Id, t => t.Ad);
         ViewBag.Kullanicilar = kullanicilar.ToDictionary(k => k.Id, k => k.AdSoyad);
         // Personelin arıza bildirebileceği aktif zimmet kalemleri
         var zimmetler = await _svc.ZimmetleriGetirAsync();
+        if (Rol != AtomRoller.Personel && !Bakanlik)
+        {
+            var depolar = await _svc.DepolariGetirAsync();
+            var kurumDepolar = depolar.Where(d => d.KurumId == KurumId).Select(d => d.Id).ToHashSet();
+            zimmetler = zimmetler.Where(z => kurumDepolar.Contains(z.DepoId)).ToList();
+        }
         ViewBag.AktifZimmetler = zimmetler
             .Where(z => z.Durum == ZimmetDurumu.Aktif && (Rol != AtomRoller.Personel || z.PersonelId == KullaniciId))
             .ToList();
@@ -326,6 +415,10 @@ public class HomeController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ArizaBildir(string zimmetId, string tasinirKayitId, string tasinirTanimId, string seriNo, string aciklama)
     {
+        var zimmet = await _svc.ZimmetGetirAsync(zimmetId);
+        if (zimmet == null || !await ZimmeteYetkiliMi(zimmet)) return Forbid();
+        if (!zimmet.Kalemler.Any(k => k.TasinirKayitId == tasinirKayitId || k.TasinirTanimId == tasinirTanimId)) return Forbid();
+
         var bk = new BakimKaydi
         {
             BakimNo = await _svc.YeniNumaraUretAsync("BKM"),

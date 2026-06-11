@@ -1,0 +1,44 @@
+@model List<ATOM.Models.Domain.MalCikisBelgesi>
+@using ATOM.Models.Domain
+@{
+    ViewData["Title"] = "Mal Çıkışları";
+    var depolar = ViewBag.Depolar as Dictionary<string, string> ?? new();
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+}
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item active">Mal Çıkışı</li></ol> }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-box-arrow-up me-2 text-primary"></i>Mal Çıkışı <span class="text-muted fw-normal small">(satış / bağış-hibe / fire / kayıp)</span></h5>
+    <div class="dropdown">
+        <button class="btn btn-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-plus-lg me-1"></i>Yeni Çıkış</button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            @foreach (var y in new[]{CikisYontemi.SatisSuretiyle,CikisYontemi.BagisHibe,CikisYontemi.Fire,CikisYontemi.KayipCalinma,CikisYontemi.Diger})
+            { <li><a class="dropdown-item" href="/edinim/Cikis/Yeni?yontem=@y">@GirisCikisYardimci.CikisAd(y)</a></li> }
+        </ul>
+    </div>
+</div>
+<div class="alert alert-light border small mb-3">
+    <i class="bi bi-info-circle me-1"></i>Tüketim, zimmet, devir ve hurda çıkışları kendi modüllerindedir (Depo, Zimmet, Devir, Hurda). Bu ekran satış/bağış/fire/kayıp içindir.
+</div>
+
+<div class="card"><div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+        <thead class="table-light"><tr><th>Çıkış No</th><th>Yöntem</th><th>Depo</th><th>Tarih</th><th>TİF</th><th>Alıcı/Dayanak</th><th class="text-center">Kalem</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var c in Model)
+        {
+            <tr>
+                <td class="fw-semibold">@c.CikisNo</td>
+                <td><span class="badge bg-secondary">@GirisCikisYardimci.CikisAd(c.Yontem)</span></td>
+                <td class="small">@(depolar.TryGetValue(c.DepoId, out var d) ? d : "–")</td>
+                <td class="small">@c.Tarih.ToString("dd.MM.yyyy")</td>
+                <td class="small text-muted">@c.TifNo</td>
+                <td class="small">@c.AliciBilgi @(c.SatisBedeli > 0 ? $"({c.SatisBedeli.ToString("C0", tr)})" : "")</td>
+                <td class="text-center">@c.Kalemler.Count</td>
+                <td><a href="/edinim/Cikis/Detay/@c.Id" class="btn btn-sm btn-outline-secondary py-0">Detay</a></td>
+            </tr>
+        }
+        @if (!Model.Any()) { <tr><td colspan="8" class="text-center text-muted py-4">Henüz çıkış yok.</td></tr> }
+        </tbody>
+    </table>
+</div></div></div>

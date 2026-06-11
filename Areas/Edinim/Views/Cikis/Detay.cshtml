@@ -1,0 +1,38 @@
+@model ATOM.Models.Domain.MalCikisBelgesi
+@using ATOM.Models.Domain
+@{
+    ViewData["Title"] = $"Mal Çıkış – {Model.CikisNo}";
+    var tanimlar = ViewBag.Tanimlar as Dictionary<string, string> ?? new();
+    var depolar = ViewBag.Depolar as Dictionary<string, string> ?? new();
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+}
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/edinim/Cikis">Mal Çıkışı</a></li><li class="breadcrumb-item active">@Model.CikisNo</li></ol> }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-box-arrow-up me-2 text-primary"></i>@Model.CikisNo
+        <span class="badge bg-secondary ms-1">@GirisCikisYardimci.CikisAd(Model.Yontem)</span></h5>
+    <span class="badge bg-success">@Model.Durum</span>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="card mb-3"><div class="card-body"><div class="row g-3">
+            <div class="col-md-4"><label class="text-muted small">Depo</label><div>@(depolar.TryGetValue(Model.DepoId, out var d) ? d : "–")</div></div>
+            <div class="col-md-4"><label class="text-muted small">TİF No</label><div class="fw-semibold">@Model.TifNo</div></div>
+            <div class="col-md-4"><label class="text-muted small">Tarih</label><div>@Model.Tarih.ToString("dd.MM.yyyy")</div></div>
+            <div class="col-md-4"><label class="text-muted small">Alıcı / Hedef</label><div>@(string.IsNullOrEmpty(Model.AliciBilgi)?"–":Model.AliciBilgi)</div></div>
+            @if (Model.SatisBedeli > 0) { <div class="col-md-4"><label class="text-muted small">Satış Bedeli</label><div class="fw-semibold text-success">@Model.SatisBedeli.ToString("C2", tr)</div></div> }
+            @if (!string.IsNullOrEmpty(Model.DayanakBelge)) { <div class="col-md-4"><label class="text-muted small">Dayanak</label><div>@Model.DayanakBelge</div></div> }
+        </div></div></div>
+        <div class="card"><div class="card-header bg-white fw-semibold">Kalemler (@Model.Kalemler.Count)</div>
+            <div class="card-body p-0"><div class="table-responsive">
+                <table class="table table-sm mb-0"><thead class="table-light"><tr><th>Taşınır</th><th class="text-center">Miktar</th></tr></thead>
+                    <tbody>
+                    @foreach (var k in Model.Kalemler)
+                    { <tr><td>@(tanimlar.TryGetValue(k.TasinirTanimId, out var t) ? t : k.TasinirTanimId)</td><td class="text-center">@k.Miktar</td></tr> }
+                    </tbody>
+                </table>
+            </div></div>
+        </div>
+    </div>
+</div>

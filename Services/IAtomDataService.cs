@@ -79,6 +79,12 @@ public interface IAtomDataService
     Task<List<StokHareket>> StokHareketleriGetirAsync();
     Task StokHareketKaydetAsync(StokHareket hareket);
 
+    // ── Personel Sarf İzleme ─────────────────────────────────
+    Task<List<PersonelSarfBakiye>> PersonelSarfBakiyeleriGetirAsync();
+    Task PersonelSarfBakiyeKaydetAsync(PersonelSarfBakiye bakiye);
+    Task<List<PersonelSarfHareket>> PersonelSarfHareketleriGetirAsync();
+    Task PersonelSarfHareketKaydetAsync(PersonelSarfHareket hareket);
+
     // ── Sayım ─────────────────────────────────────────────────
     Task<List<SayimKaydi>> SayimlariGetirAsync();
     Task<SayimKaydi?> SayimGetirAsync(string id);
@@ -98,6 +104,14 @@ public interface IAtomDataService
     Task<List<ElektronikImza>> ImzalariGetirAsync();
     Task<ElektronikImza?> ImzaDogrulamaKoduylaGetirAsync(string kod);
     Task ImzaKaydetAsync(ElektronikImza imza);
+
+    // ── Mal Giriş / Çıkış Belgeleri ───────────────────────────
+    Task<List<MalGirisBelgesi>> MalGirisleriGetirAsync();
+    Task<MalGirisBelgesi?> MalGirisGetirAsync(string id);
+    Task MalGirisKaydetAsync(MalGirisBelgesi belge);
+    Task<List<MalCikisBelgesi>> MalCikislariGetirAsync();
+    Task<MalCikisBelgesi?> MalCikisGetirAsync(string id);
+    Task MalCikisKaydetAsync(MalCikisBelgesi belge);
 
     // ── Audit Log ─────────────────────────────────────────────
     Task<List<AuditLog>> AuditLoglariGetirAsync();

@@ -99,6 +99,8 @@ public class Depo
     public string KurumId { get; set; } = "";
     public bool MerkezDepoMu { get; set; }
     public string SorumluId { get; set; } = "";
+    [Required(ErrorMessage = "Depo adresi zorunludur.")]
+    [MinLength(20, ErrorMessage = "Depo adresi il/ilçe, mahalle/cadde/sokak ve kurum yerleşkesini içerecek şekilde tam girilmelidir.")]
     public string Adres { get; set; } = "";
     public double KapasiteM2 { get; set; }
     public bool AktifMi { get; set; } = true;

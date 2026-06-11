@@ -1,0 +1,55 @@
+@model ATOM.Models.Domain.MalGirisBelgesi
+@using ATOM.Models.Domain
+@{
+    ViewData["Title"] = $"Mal Giriş – {Model.GirisNo}";
+    var tanimlar = ViewBag.Tanimlar as Dictionary<string, string> ?? new();
+    var depolar = ViewBag.Depolar as Dictionary<string, string> ?? new();
+    var firmalar = ViewBag.Firmalar as Dictionary<string, string> ?? new();
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+}
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/edinim/Giris">Mal Girişi</a></li><li class="breadcrumb-item active">@Model.GirisNo</li></ol> }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-box-arrow-in-down me-2 text-primary"></i>@Model.GirisNo
+        <span class="badge bg-secondary ms-1">@GirisCikisYardimci.GirisAd(Model.Yontem)</span></h5>
+    <span class="badge bg-success">@Model.Durum</span>
+</div>
+
+<div class="alert alert-light border small mb-3"><i class="bi bi-bank me-1 text-primary"></i><strong>Dayanak:</strong> @GirisCikisYardimci.GirisDayanak(Model.Yontem)</div>
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="card mb-3"><div class="card-body"><div class="row g-3">
+            <div class="col-md-4"><label class="text-muted small">Depo</label><div>@(depolar.TryGetValue(Model.DepoId, out var d) ? d : "–")</div></div>
+            <div class="col-md-4"><label class="text-muted small">TİF No</label><div class="fw-semibold">@Model.TifNo</div></div>
+            <div class="col-md-4"><label class="text-muted small">Tarih</label><div>@Model.Tarih.ToString("dd.MM.yyyy")</div></div>
+            @if (!string.IsNullOrEmpty(Model.FirmaId)) { <div class="col-md-4"><label class="text-muted small">Firma</label><div>@(firmalar.TryGetValue(Model.FirmaId, out var f) ? f : "–")</div></div> }
+            @if (!string.IsNullOrEmpty(Model.FaturaNo)) { <div class="col-md-4"><label class="text-muted small">Fatura</label><div>@Model.FaturaNo (@Model.FaturaTutari.ToString("C0", tr))</div></div> }
+            @if (!string.IsNullOrEmpty(Model.BagisYapan)) { <div class="col-md-4"><label class="text-muted small">Bağış Yapan</label><div>@Model.BagisYapan</div></div> }
+            @if (!string.IsNullOrEmpty(Model.ButceTertibi)) { <div class="col-md-4"><label class="text-muted small">Bütçe Tertibi</label><div>@Model.ButceTertibi</div></div> }
+            @if (!string.IsNullOrEmpty(Model.DayanakBelge)) { <div class="col-md-4"><label class="text-muted small">Dayanak Belge</label><div>@Model.DayanakBelge</div></div> }
+        </div></div></div>
+
+        <div class="card"><div class="card-header bg-white fw-semibold">Kalemler (@Model.Kalemler.Count)</div>
+            <div class="card-body p-0"><div class="table-responsive">
+                <table class="table table-sm mb-0"><thead class="table-light"><tr><th>Taşınır</th><th>Tür</th><th class="text-center">Miktar</th><th class="text-end">Birim Fiyat</th><th class="text-end">Tutar</th></tr></thead>
+                    <tbody>
+                    @foreach (var k in Model.Kalemler)
+                    { <tr><td>@(tanimlar.TryGetValue(k.TasinirTanimId, out var t) ? t : k.TasinirTanimId)</td>
+                          <td>@(k.DemirbasMi ? "<span class='badge bg-warning text-dark'>Demirbaş</span>" : "<span class='badge bg-info'>Sarf</span>")</td>
+                          <td class="text-center">@k.Miktar</td><td class="text-end">@k.BirimFiyat.ToString("C2", tr)</td>
+                          <td class="text-end fw-semibold">@((k.Miktar * k.BirimFiyat).ToString("C2", tr))</td></tr> }
+                    </tbody>
+                </table>
+            </div></div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card"><div class="card-body">
+            <div class="text-muted small">Toplam Tutar</div>
+            <div class="fs-4 fw-bold text-success">@Model.Kalemler.Sum(k => k.Miktar * k.BirimFiyat).ToString("C2", tr)</div>
+            <hr/>
+            <div class="small">@(Model.TasinirKayitUretildiMi ? "<i class='bi bi-check-circle text-success'></i> Demirbaş kayıtları üretildi" : "<i class='bi bi-dash-circle text-muted'></i> Tekil kayıt yok (sarf)")</div>
+        </div></div>
+    </div>
+</div>

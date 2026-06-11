@@ -1,0 +1,61 @@
+@model List<ATOM.Models.Domain.PersonelSarfBakiye>
+@using ATOM.Models.Domain
+@{
+    ViewData["Title"] = "Üzerimdeki Sarf Malzemeler";
+    var kullanicilar = ViewBag.Kullanicilar as Dictionary<string, string> ?? new();
+    var depolar = ViewBag.Depolar as Dictionary<string, string> ?? new();
+    var tanimlar = ViewBag.Tanimlar as Dictionary<string, TasinirTanim> ?? new();
+}
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/zimmet">Zimmet</a></li><li class="breadcrumb-item active">Sarf Malzemeler</li></ol> }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-basket2 me-2 text-primary"></i>Üzerimdeki Sarf Malzemeler</h5>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Personel</th>
+                    <th>Malzeme</th>
+                    <th>Kaynak Depo</th>
+                    <th class="text-end">Bakiye</th>
+                    <th>Son Güncelleme</th>
+                    <th style="width:320px;">Tüketim / Düşüm</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var b in Model)
+            {
+                var tanim = tanimlar.GetValueOrDefault(b.TasinirTanimId);
+                <tr>
+                    <td>@(kullanicilar.GetValueOrDefault(b.PersonelId) ?? b.PersonelId)</td>
+                    <td>
+                        <div class="fw-semibold">@tanim?.Ad</div>
+                        <div class="text-muted small">@tanim?.Kod</div>
+                    </td>
+                    <td>@(depolar.GetValueOrDefault(b.KaynakDepoId) ?? b.KaynakDepoId)</td>
+                    <td class="text-end fw-semibold">@b.Miktar @tanim?.Birim</td>
+                    <td>@b.SonGuncelleme.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                    <td>
+                        <form method="post" action="/zimmet/Home/SarfDus" class="d-flex gap-2">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="bakiyeId" value="@b.Id" />
+                            <input type="number" name="miktar" min="1" max="@b.Miktar" value="1" class="form-control form-control-sm" style="width:80px;" />
+                            <input name="aciklama" class="form-control form-control-sm" placeholder="Kullanım amacı" />
+                            <button class="btn btn-sm btn-outline-danger" title="Sarf düş">
+                                <i class="bi bi-box-arrow-down"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            @if (!Model.Any())
+            {
+                <tr><td colspan="6" class="text-center text-muted py-4">Üzerinizde takip edilen sarf malzeme yok.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

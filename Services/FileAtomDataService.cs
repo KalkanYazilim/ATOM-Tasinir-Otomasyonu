@@ -164,6 +164,12 @@ public class FileAtomDataService : IAtomDataService
     public Task<List<StokHareket>> StokHareketleriGetirAsync() => OkuAsync<StokHareket>("stok-hareketler");
     public Task StokHareketKaydetAsync(StokHareket h) => UpsertAsync("stok-hareketler", h, x => x.Id);
 
+    // ── Personel Sarf İzleme ─────────────────────────────────
+    public Task<List<PersonelSarfBakiye>> PersonelSarfBakiyeleriGetirAsync() => OkuAsync<PersonelSarfBakiye>("personel-sarf-bakiyeler");
+    public Task PersonelSarfBakiyeKaydetAsync(PersonelSarfBakiye b) => UpsertAsync("personel-sarf-bakiyeler", b, x => x.Id);
+    public Task<List<PersonelSarfHareket>> PersonelSarfHareketleriGetirAsync() => OkuAsync<PersonelSarfHareket>("personel-sarf-hareketler");
+    public Task PersonelSarfHareketKaydetAsync(PersonelSarfHareket h) => UpsertAsync("personel-sarf-hareketler", h, x => x.Id);
+
     // ── Sayım ─────────────────────────────────────────────────
     public Task<List<SayimKaydi>> SayimlariGetirAsync() => OkuAsync<SayimKaydi>("sayimlar");
     public async Task<SayimKaydi?> SayimGetirAsync(string id) => (await SayimlariGetirAsync()).FirstOrDefault(x => x.Id == id);
@@ -184,6 +190,14 @@ public class FileAtomDataService : IAtomDataService
     public async Task<ElektronikImza?> ImzaDogrulamaKoduylaGetirAsync(string kod) =>
         (await ImzalariGetirAsync()).FirstOrDefault(x => x.DogrulamaKodu.Equals(kod, StringComparison.OrdinalIgnoreCase));
     public Task ImzaKaydetAsync(ElektronikImza imza) => UpsertAsync("imzalar", imza, x => x.Id);
+
+    // ── Mal Giriş / Çıkış Belgeleri ───────────────────────────
+    public Task<List<MalGirisBelgesi>> MalGirisleriGetirAsync() => OkuAsync<MalGirisBelgesi>("mal-girisler");
+    public async Task<MalGirisBelgesi?> MalGirisGetirAsync(string id) => (await MalGirisleriGetirAsync()).FirstOrDefault(x => x.Id == id);
+    public Task MalGirisKaydetAsync(MalGirisBelgesi b) => UpsertAsync("mal-girisler", b, x => x.Id);
+    public Task<List<MalCikisBelgesi>> MalCikislariGetirAsync() => OkuAsync<MalCikisBelgesi>("mal-cikislar");
+    public async Task<MalCikisBelgesi?> MalCikisGetirAsync(string id) => (await MalCikislariGetirAsync()).FirstOrDefault(x => x.Id == id);
+    public Task MalCikisKaydetAsync(MalCikisBelgesi b) => UpsertAsync("mal-cikislar", b, x => x.Id);
 
     // ── Audit Log ─────────────────────────────────────────────
     public Task<List<AuditLog>> AuditLoglariGetirAsync() => OkuAsync<AuditLog>("audit-loglar");

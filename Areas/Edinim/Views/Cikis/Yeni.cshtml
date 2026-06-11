@@ -1,0 +1,65 @@
+@model ATOM.Models.Domain.MalCikisBelgesi
+@using ATOM.Models.Domain
+@{
+    ViewData["Title"] = "Yeni Mal Çıkışı";
+    var depolar = ViewBag.Depolar as List<Depo> ?? new();
+    var tanimlar = ViewBag.Tanimlar as List<TasinirTanim> ?? new();
+    var yontem = (CikisYontemi)(ViewBag.SecilenYontem ?? CikisYontemi.SatisSuretiyle);
+}
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/edinim/Cikis">Mal Çıkışı</a></li><li class="breadcrumb-item active">Yeni</li></ol> }
+
+<form method="post" action="/edinim/Cikis/Yeni">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="Yontem" value="@yontem"/>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0 fw-bold"><i class="bi bi-box-arrow-up me-2 text-primary"></i>@GirisCikisYardimci.CikisAd(yontem)</h5>
+        <div><a href="/edinim/Cikis" class="btn btn-outline-secondary btn-sm">İptal</a>
+            <button class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Çıkışı Kaydet</button></div>
+    </div>
+
+    <div class="card mb-3"><div class="card-body"><div class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold">Yöntem</label>
+            <select class="form-select form-select-sm" onchange="location.href='/edinim/Cikis/Yeni?yontem='+this.value">
+                @foreach (var y in new[]{CikisYontemi.SatisSuretiyle,CikisYontemi.BagisHibe,CikisYontemi.Fire,CikisYontemi.KayipCalinma,CikisYontemi.Diger})
+                { if (y == yontem) { <option value="@y" selected>@GirisCikisYardimci.CikisAd(y)</option> } else { <option value="@y">@GirisCikisYardimci.CikisAd(y)</option> } }
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold">Depo <span class="text-danger">*</span></label>
+            <select name="DepoId" class="form-select form-select-sm" required>
+                <option value="">– Seçiniz –</option>
+                @foreach (var d in depolar) { <option value="@d.Id">@d.Ad</option> }
+            </select>
+        </div>
+        <div class="col-md-4"><label class="form-label small fw-semibold">Alıcı / Hedef</label><input name="AliciBilgi" class="form-control form-control-sm" placeholder="Satış alıcısı / bağış alanı"/></div>
+        @if (yontem == CikisYontemi.SatisSuretiyle)
+        { <div class="col-md-4"><label class="form-label small fw-semibold">Satış Bedeli (₺)</label><input name="SatisBedeli" type="number" step="0.01" value="0" class="form-control form-control-sm"/></div> }
+        <div class="col-md-4"><label class="form-label small fw-semibold">Dayanak Belge (karar/onay no)</label><input name="DayanakBelge" class="form-control form-control-sm"/></div>
+        <div class="col-12"><label class="form-label small fw-semibold">Açıklama</label><input name="Aciklama" class="form-control form-control-sm"/></div>
+    </div></div></div>
+
+    <div class="card"><div class="card-header bg-white fw-semibold d-flex justify-content-between">
+        <span><i class="bi bi-list-ul me-2"></i>Çıkış Kalemleri</span>
+        <button type="button" class="btn btn-outline-primary btn-sm py-0" onclick="kalemEkle()"><i class="bi bi-plus"></i> Kalem Ekle</button>
+    </div>
+    <div class="card-body p-0"><div class="table-responsive">
+        <table class="table table-sm mb-0"><thead class="table-light"><tr><th style="min-width:240px">Taşınır</th><th>Miktar</th><th></th></tr></thead>
+            <tbody id="kalemBody"></tbody></table>
+    </div></div></div>
+    <p class="text-muted small mt-2"><i class="bi bi-info-circle me-1"></i>Negatif stok engellenir; belgeli stok hareketi ve TİF üretilir.</p>
+</form>
+
+@section Scripts {
+<script>
+const opts = `@Html.Raw(string.Join("", tanimlar.Select(t => $"<option value='{t.Id}'>{System.Net.WebUtility.HtmlEncode(t.Ad)}</option>")))`;
+function kalemEkle() {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><select name="tasinirIds" class="form-select form-select-sm">${opts}</select></td>
+        <td><input name="miktarlar" type="number" value="1" min="1" class="form-control form-control-sm" style="width:90px"/></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger py-0" onclick="this.closest('tr').remove()">×</button></td>`;
+    document.getElementById('kalemBody').appendChild(tr);
+}
+kalemEkle();
+</script>
+}

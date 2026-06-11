@@ -1,0 +1,41 @@
+@model List<ATOM.Models.Domain.MalGirisBelgesi>
+@using ATOM.Models.Domain
+@{
+    ViewData["Title"] = "Mal Girişleri";
+    var depolar = ViewBag.Depolar as Dictionary<string, string> ?? new();
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+}
+@section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item active">Mal Girişi</li></ol> }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-box-arrow-in-down me-2 text-primary"></i>Mal Girişi <span class="text-muted fw-normal small">(tüm yasal yöntemler)</span></h5>
+    <div class="dropdown">
+        <button class="btn btn-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-plus-lg me-1"></i>Yeni Giriş</button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            @foreach (var y in Enum.GetValues<GirisYontemi>())
+            { <li><a class="dropdown-item" href="/edinim/Giris/Yeni?yontem=@y">@GirisCikisYardimci.GirisAd(y)</a></li> }
+        </ul>
+    </div>
+</div>
+
+<div class="card"><div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+        <thead class="table-light"><tr><th>Giriş No</th><th>Yöntem</th><th>Depo</th><th>Tarih</th><th>TİF</th><th class="text-center">Kalem</th><th class="text-end">Tutar</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var g in Model)
+        {
+            <tr>
+                <td class="fw-semibold">@g.GirisNo</td>
+                <td><span class="badge bg-secondary">@GirisCikisYardimci.GirisAd(g.Yontem)</span></td>
+                <td class="small">@(depolar.TryGetValue(g.DepoId, out var d) ? d : "–")</td>
+                <td class="small">@g.Tarih.ToString("dd.MM.yyyy")</td>
+                <td class="small text-muted">@g.TifNo</td>
+                <td class="text-center">@g.Kalemler.Count</td>
+                <td class="text-end">@g.Kalemler.Sum(k => k.Miktar * k.BirimFiyat).ToString("C0", tr)</td>
+                <td><a href="/edinim/Giris/Detay/@g.Id" class="btn btn-sm btn-outline-secondary py-0">Detay</a></td>
+            </tr>
+        }
+        @if (!Model.Any()) { <tr><td colspan="8" class="text-center text-muted py-4">Henüz mal girişi yok.</td></tr> }
+        </tbody>
+    </table>
+</div></div></div>

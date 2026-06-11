@@ -18,6 +18,8 @@ public class SeedDataHostedService : IHostedService
         await SeedKullanicilar(svc);
         await SeedTasinirTanimlar(svc);
         await SeedDepolar(svc);
+        await SeedUlusalAileSosyalHizmetKurumVeDepolari(svc);
+        await SeedGercekciUlkeGeneliCanliVeri(svc);
         await SeedFirmalar(svc);
         await SeedTasinirKayitlar(svc);
         await SeedIslemler(svc);
@@ -188,7 +190,425 @@ public class SeedDataHostedService : IHostedService
             MuayeneBitisTarihi=now.AddDays(-5), SigortaBitisTarihi=now.AddDays(90) });
     }
 
+    private static async Task SeedGercekciUlkeGeneliCanliVeri(IAtomDataService svc)
+    {
+        var kurumlar = await svc.KurumlariGetirAsync();
+        var depolar = await svc.DepolariGetirAsync();
+        var tanimlar = await svc.TasinirTanimlariGetirAsync();
+        var kullanicilar = await svc.KullanicilariGetirAsync();
+        var stokHareketler = await svc.StokHareketleriGetirAsync();
+        var personelSarfBakiyeler = await svc.PersonelSarfBakiyeleriGetirAsync();
+        var tasinirKayitlar = await svc.TasinirKayitlariGetirAsync();
+        var zimmetler = await svc.ZimmetleriGetirAsync();
+        var rnd = new Random(20260611);
+        var soyadlar = new[] { "Yılmaz", "Kaya", "Demir", "Şahin", "Çelik", "Yıldız", "Arslan", "Koç", "Aydın", "Öztürk" };
+        var adlar = new[] { "Ayşe", "Fatma", "Zeynep", "Elif", "Merve", "Mehmet", "Mustafa", "Ali", "Emre", "Hasan" };
+        var sarfTanimlar = tanimlar.Where(t => !t.DemirbasMi).ToList();
+        var demirbasTanimlar = tanimlar.Where(t => t.DemirbasMi).ToList();
+
+        foreach (var kurum in kurumlar.Where(k => k.Tur == KurumTur.IlMudurlugu && k.AktifMi))
+        {
+            var slug = ToAsciiSlug(kurum.Il);
+            for (var i = 1; i <= 3; i++)
+            {
+                var id = $"u-{slug}-personel-{i:00}";
+                if (kullanicilar.Any(k => k.Id == id)) continue;
+                var adSoyad = $"{adlar[(i + kurum.Il.Length) % adlar.Length]} {soyadlar[(i * 3 + kurum.Il.Length) % soyadlar.Length]}";
+                var kullanici = new AtomKullanici
+                {
+                    Id = id,
+                    AdSoyad = adSoyad,
+                    KullaniciAdi = $"{slug}.personel{i}",
+                    Email = $"{slug}.personel{i}@aile.gov.tr",
+                    Rol = AtomRoller.Personel,
+                    KurumId = kurum.Id,
+                    Telefon = $"0 5{rnd.Next(30, 59)} {rnd.Next(100, 999)} {rnd.Next(10, 99)} {rnd.Next(10, 99)}",
+                    SifreHash = BC.HashPassword("Personel123!")
+                };
+                await svc.KullaniciKaydetAsync(kullanici);
+                kullanicilar.Add(kullanici);
+            }
+        }
+
+        foreach (var depo in depolar.Where(d => d.AktifMi))
+        {
+            if (depo.Stoklar.Count > 0) continue;
+            var isMerkez = depo.MerkezDepoMu || depo.KurumId == "k-bakanlik";
+            var isAna = depo.Kod.EndsWith("-ANA", StringComparison.OrdinalIgnoreCase) || depo.Ad.Contains("İl Deposu", StringComparison.OrdinalIgnoreCase);
+            var carpan = isMerkez ? 8 : isAna ? 3 : 1;
+
+            foreach (var t in sarfTanimlar)
+            {
+                var miktar = Math.Max(5, rnd.Next(12, 90) * carpan);
+                depo.Stoklar.Add(new DepoStok
+                {
+                    TasinirTanimId = t.Id,
+                    Miktar = miktar,
+                    MinEsik = Math.Max(3, miktar / 5),
+                    BirimMaliyet = t.Id switch
+                    {
+                        "tt-013" => 95,
+                        "tt-014" => 620,
+                        "tt-019" => 7,
+                        "tt-020" => 18,
+                        _ => rnd.Next(10, 120)
+                    },
+                    SonGuncelleme = DateTime.UtcNow.AddDays(-rnd.Next(1, 90))
+                });
+            }
+
+            foreach (var t in demirbasTanimlar.OrderBy(_ => rnd.Next()).Take(isMerkez ? 8 : isAna ? 5 : 3))
+            {
+                var miktar = Math.Max(1, rnd.Next(1, 8) * carpan);
+                depo.Stoklar.Add(new DepoStok
+                {
+                    TasinirTanimId = t.Id,
+                    Miktar = miktar,
+                    MinEsik = Math.Max(1, miktar / 6),
+                    BirimMaliyet = t.Id switch
+                    {
+                        "tt-004" => 18500,
+                        "tt-005" => 27500,
+                        "tt-001" => 7200,
+                        "tt-010" => 4200,
+                        "tt-011" => 2600,
+                        _ => rnd.Next(1500, 35000)
+                    },
+                    SonGuncelleme = DateTime.UtcNow.AddDays(-rnd.Next(1, 120))
+                });
+            }
+            await svc.DepoKaydetAsync(depo);
+        }
+
+        var tekilSayac = tasinirKayitlar.Count + 5000;
+        foreach (var depo in depolar.Where(d => d.AktifMi && !tasinirKayitlar.Any(k => k.DepoId == d.Id)).Take(489))
+        {
+            var kurum = kurumlar.FirstOrDefault(k => k.Id == depo.KurumId);
+            var il = kurum?.Il ?? "Ankara";
+            var ilKod = depo.Kod.Split('-').Skip(1).FirstOrDefault() ?? "00";
+            var demirbasStoklar = depo.Stoklar.Where(s => demirbasTanimlar.Any(t => t.Id == s.TasinirTanimId)).Take(3).ToList();
+            foreach (var stok in demirbasStoklar)
+            {
+                var tanim = demirbasTanimlar.First(t => t.Id == stok.TasinirTanimId);
+                tekilSayac++;
+                var kayit = new TasinirKayit
+                {
+                    Id = $"tk-{depo.Id}-{stok.TasinirTanimId}-{tekilSayac}",
+                    BarKod = $"BK{ilKod}{tekilSayac:D7}",
+                    Cinsi = tanim.Ad,
+                    Aciklama = $"{depo.Ad} envanterinde kayıtlı {tanim.Ad}",
+                    MarkaAdi = tanim.Id switch
+                    {
+                        "tt-004" => "Dell",
+                        "tt-005" => "Lenovo",
+                        "tt-001" => "HP",
+                        "tt-010" => "Bürotime",
+                        "tt-011" => "Koleksiyon",
+                        _ => "Kamu Standardı"
+                    },
+                    Modeli = tanim.Id switch
+                    {
+                        "tt-004" => "OptiPlex 7010",
+                        "tt-005" => "ThinkPad E15",
+                        "tt-001" => "LaserJet Pro M404",
+                        "tt-010" => "Çalışma Masası",
+                        "tt-011" => "Ergonomik Koltuk",
+                        _ => "2026"
+                    },
+                    OlcuAdi = "Adet",
+                    SicilNo = $"255.{ilKod}.{tekilSayac:D6}",
+                    SeriNo = $"SN-{ToAsciiSlug(il).ToUpperInvariant()[..Math.Min(3, ToAsciiSlug(il).Length)]}-{rnd.Next(100000, 999999)}",
+                    BirimFiyat = stok.BirimMaliyet,
+                    FisNo = $"TIF-{DateTime.UtcNow.Year}-{rnd.Next(1000, 9999)}",
+                    FisIlkDurum = "Satın Alma Girişi",
+                    FisSonDurum = "Ambarda",
+                    Tarih = DateTime.UtcNow.AddDays(-rnd.Next(10, 720)),
+                    AmbarAdi = depo.Ad,
+                    KurumGirisIslemi = "Satın Alma",
+                    KurumGirisTarihi = DateTime.UtcNow.AddDays(-rnd.Next(10, 720)),
+                    IlkGirisTarihi = DateTime.UtcNow.AddDays(-rnd.Next(10, 720)),
+                    LimitDurumu = stok.BirimMaliyet >= 10000 ? "Limit Üstü" : "Limit Altı",
+                    HarBirimiAdi = "Destek Hizmetleri",
+                    HarBirimiKodu = $"38.{ilKod}.00.01",
+                    IlAdi = il,
+                    IlKodu = ilKod,
+                    SayKod = $"SAY-{DateTime.UtcNow.Year}",
+                    SayAdi = $"{DateTime.UtcNow.Year} Yılı Sayımı",
+                    TasinirTanimId = tanim.Id,
+                    DepoId = depo.Id,
+                    KurumId = depo.KurumId,
+                    Durum = TasinirKayitDurumu.Ambarda,
+                    HareketGecmisi = new()
+                    {
+                        new TasinirHareket
+                        {
+                            Tarih = DateTime.UtcNow.AddDays(-rnd.Next(10, 720)),
+                            IslemTuru = "Kurum Girişi",
+                            Aciklama = "Gerçekçi açılış envanteri olarak kayda alındı.",
+                            KullaniciAdi = "Sistem Yöneticisi",
+                            YeniDurum = "Ambarda"
+                        }
+                    }
+                };
+                tasinirKayitlar.Add(kayit);
+                await svc.TasinirKayitKaydetAsync(kayit);
+            }
+        }
+
+        foreach (var kurum in kurumlar.Where(k => k.Tur == KurumTur.IlMudurlugu).Take(60))
+        {
+            var personel = kullanicilar.FirstOrDefault(k => k.KurumId == kurum.Id && k.Rol == AtomRoller.Personel);
+            if (personel == null || zimmetler.Any(z => z.PersonelId == personel.Id && z.Durum == ZimmetDurumu.Aktif)) continue;
+            var kayitlar = tasinirKayitlar.Where(k => k.KurumId == kurum.Id && k.Durum == TasinirKayitDurumu.Ambarda && !string.IsNullOrWhiteSpace(k.DepoId)).Take(2).ToList();
+            if (!kayitlar.Any()) continue;
+            var zimmet = new Zimmet
+            {
+                Id = $"zm-seed-{personel.Id}",
+                ZimmetNo = await svc.YeniNumaraUretAsync("ZMT"),
+                DepoId = kayitlar.First().DepoId ?? "",
+                PersonelId = personel.Id,
+                VerenKullaniciId = "u-admin",
+                ZimmetTarihi = DateTime.UtcNow.AddDays(-rnd.Next(1, 180)),
+                Durum = ZimmetDurumu.Aktif,
+                TeslimAlanImzaDurumu = "İmzalandı",
+                TeslimYeri = kurum.Ad,
+                Aciklama = "Gerçekçi ülke geneli örnek personel zimmeti.",
+                Kalemler = kayitlar.Select(k => new ZimmetKalemi
+                {
+                    TasinirKayitId = k.Id,
+                    TasinirTanimId = k.TasinirTanimId ?? "",
+                    Miktar = 1,
+                    SeriNo = k.SeriNo,
+                    Barkod = k.BarKod,
+                    SicilNo = k.SicilNo,
+                    Marka = k.MarkaAdi,
+                    Model = k.Modeli
+                }).ToList()
+            };
+            zimmet.OnayGecmisi.Add(new OnayKaydi
+            {
+                KullaniciId = "u-admin",
+                KullaniciAdi = "Sistem Yöneticisi",
+                Rol = AtomRoller.SistemAdmin,
+                Karar = OnayDurumu.Onaylandi,
+                Asama = "Zimmet Oluşturma",
+                Tarih = zimmet.ZimmetTarihi
+            });
+            await svc.ZimmetKaydetAsync(zimmet);
+            zimmetler.Add(zimmet);
+            foreach (var kayit in kayitlar)
+            {
+                kayit.Durum = TasinirKayitDurumu.Zimmetli;
+                kayit.ZimmetId = zimmet.Id;
+                kayit.FisSonDurum = "Zimmet";
+                kayit.VerildigiYerBirim = personel.AdSoyad;
+                kayit.HareketGecmisi.Add(new TasinirHareket
+                {
+                    Tarih = zimmet.ZimmetTarihi,
+                    IslemTuru = "Zimmet",
+                    Aciklama = $"{zimmet.ZimmetNo} ile {personel.AdSoyad} adlı personele zimmetlendi.",
+                    KullaniciAdi = "Sistem Yöneticisi",
+                    OncekiDurum = "Ambarda",
+                    YeniDurum = "Zimmetli"
+                });
+                await svc.TasinirKayitKaydetAsync(kayit);
+            }
+        }
+
+        foreach (var depo in depolar.Where(d => d.Stoklar.Count > 0).Take(120))
+        {
+            if (stokHareketler.Any(h => h.DepoId == depo.Id && h.IslemTuru == StokIslemTuru.AcilisGirisi)) continue;
+            foreach (var stok in depo.Stoklar.Take(6))
+            {
+                await svc.StokHareketKaydetAsync(new StokHareket
+                {
+                    HareketNo = await svc.YeniNumaraUretAsync("SH"),
+                    DepoId = depo.Id,
+                    TasinirTanimId = stok.TasinirTanimId,
+                    IslemTuru = StokIslemTuru.AcilisGirisi,
+                    GirisMiktar = stok.Miktar,
+                    KalanMiktar = stok.Miktar,
+                    BirimMaliyet = stok.BirimMaliyet,
+                    ToplamTutar = stok.BirimMaliyet * stok.Miktar,
+                    KaynakBelgeTur = "Seed",
+                    KaynakBelgeNo = $"ACLS-{DateTime.UtcNow.Year}-{depo.Kod}",
+                    KullaniciId = "u-admin",
+                    KullaniciAdi = "Sistem Yöneticisi",
+                    Aciklama = "Gerçekçi ülke geneli açılış stoğu."
+                });
+            }
+        }
+
+        if (personelSarfBakiyeler.Count == 0)
+        {
+            foreach (var kurum in kurumlar.Where(k => k.Tur == KurumTur.IlMudurlugu).Take(20))
+            {
+                var personel = kullanicilar.FirstOrDefault(k => k.KurumId == kurum.Id && k.Rol == AtomRoller.Personel);
+                var depo = depolar.FirstOrDefault(d => d.KurumId == kurum.Id && d.Stoklar.Any(s => sarfTanimlar.Any(t => t.Id == s.TasinirTanimId)));
+                if (personel == null || depo == null) continue;
+                foreach (var stok in depo.Stoklar.Where(s => sarfTanimlar.Any(t => t.Id == s.TasinirTanimId)).Take(2))
+                {
+                    var miktar = Math.Min(Math.Max(1, stok.Miktar / 20), 8);
+                    var belgeNo = await svc.YeniNumaraUretAsync("PSH");
+                    await svc.PersonelSarfBakiyeKaydetAsync(new PersonelSarfBakiye
+                    {
+                        PersonelId = personel.Id,
+                        KurumId = kurum.Id,
+                        KaynakDepoId = depo.Id,
+                        TasinirTanimId = stok.TasinirTanimId,
+                        Miktar = miktar,
+                        SonGuncelleme = DateTime.UtcNow.AddDays(-rnd.Next(1, 30))
+                    });
+                    await svc.PersonelSarfHareketKaydetAsync(new PersonelSarfHareket
+                    {
+                        HareketNo = belgeNo,
+                        PersonelId = personel.Id,
+                        KurumId = kurum.Id,
+                        KaynakDepoId = depo.Id,
+                        TasinirTanimId = stok.TasinirTanimId,
+                        IslemTuru = PersonelSarfIslemTuru.Verme,
+                        GirisMiktar = miktar,
+                        KalanMiktar = miktar,
+                        KaynakBelgeNo = belgeNo,
+                        KullaniciId = "u-admin",
+                        KullaniciAdi = "Sistem Yöneticisi",
+                        Aciklama = "Son kullanıcıya verilmiş gerçekçi sarf örneği."
+                    });
+                }
+            }
+        }
+    }
+
     public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
+
+    private static async Task SeedUlusalAileSosyalHizmetKurumVeDepolari(IAtomDataService svc)
+    {
+        var kurumlar = await svc.KurumlariGetirAsync();
+        var depolar = await svc.DepolariGetirAsync();
+        var bakanlik = kurumlar.FirstOrDefault(k => k.Tur == KurumTur.Bakanlik)
+            ?? kurumlar.FirstOrDefault(k => k.Id == "k-bakanlik");
+
+        if (bakanlik == null)
+        {
+            bakanlik = new Kurum
+            {
+                Id = "k-bakanlik",
+                Ad = "Bakanlık Merkez Teşkilatı",
+                Kod = "ASHB-MRK",
+                Tur = KurumTur.Bakanlik,
+                Il = "Ankara",
+                Telefon = "0312 000 0000",
+                Email = "merkez@aile.gov.tr"
+            };
+            await svc.KurumKaydetAsync(bakanlik);
+            kurumlar.Add(bakanlik);
+        }
+
+        var iller = new (int Plaka, string Il)[]
+        {
+            (1, "Adana"), (2, "Adıyaman"), (3, "Afyonkarahisar"), (4, "Ağrı"), (5, "Amasya"),
+            (6, "Ankara"), (7, "Antalya"), (8, "Artvin"), (9, "Aydın"), (10, "Balıkesir"),
+            (11, "Bilecik"), (12, "Bingöl"), (13, "Bitlis"), (14, "Bolu"), (15, "Burdur"),
+            (16, "Bursa"), (17, "Çanakkale"), (18, "Çankırı"), (19, "Çorum"), (20, "Denizli"),
+            (21, "Diyarbakır"), (22, "Edirne"), (23, "Elazığ"), (24, "Erzincan"), (25, "Erzurum"),
+            (26, "Eskişehir"), (27, "Gaziantep"), (28, "Giresun"), (29, "Gümüşhane"), (30, "Hakkari"),
+            (31, "Hatay"), (32, "Isparta"), (33, "Mersin"), (34, "İstanbul"), (35, "İzmir"),
+            (36, "Kars"), (37, "Kastamonu"), (38, "Kayseri"), (39, "Kırklareli"), (40, "Kırşehir"),
+            (41, "Kocaeli"), (42, "Konya"), (43, "Kütahya"), (44, "Malatya"), (45, "Manisa"),
+            (46, "Kahramanmaraş"), (47, "Mardin"), (48, "Muğla"), (49, "Muş"), (50, "Nevşehir"),
+            (51, "Niğde"), (52, "Ordu"), (53, "Rize"), (54, "Sakarya"), (55, "Samsun"),
+            (56, "Siirt"), (57, "Sinop"), (58, "Sivas"), (59, "Tekirdağ"), (60, "Tokat"),
+            (61, "Trabzon"), (62, "Tunceli"), (63, "Şanlıurfa"), (64, "Uşak"), (65, "Van"),
+            (66, "Yozgat"), (67, "Zonguldak"), (68, "Aksaray"), (69, "Bayburt"), (70, "Karaman"),
+            (71, "Kırıkkale"), (72, "Batman"), (73, "Şırnak"), (74, "Bartın"), (75, "Ardahan"),
+            (76, "Iğdır"), (77, "Yalova"), (78, "Karabük"), (79, "Kilis"), (80, "Osmaniye"),
+            (81, "Düzce")
+        };
+
+        var depoTurleri = new (string Suffix, string Ad, double KapasiteM2)[]
+        {
+            ("ana", "İl Müdürlüğü Ana Deposu", 450),
+            ("shm", "Sosyal Hizmet Merkezi Deposu", 180),
+            ("cocuk", "Çocuk Hizmetleri Kuruluş Deposu", 220),
+            ("yasli", "Huzurevi ve Yaşlı Bakım Kuruluş Deposu", 240),
+            ("engelli", "Engelli Bakım ve Rehabilitasyon Kuruluş Deposu", 240),
+            ("kadin", "Kadın Konukevi ve ŞÖNİM Deposu", 160)
+        };
+
+        foreach (var (plaka, il) in iller)
+        {
+            var ilKurum = kurumlar.FirstOrDefault(k =>
+                k.Tur == KurumTur.IlMudurlugu &&
+                string.Equals(k.Il, il, StringComparison.OrdinalIgnoreCase));
+
+            if (ilKurum == null)
+            {
+                ilKurum = new Kurum
+                {
+                    Id = $"k-il-{plaka:00}",
+                    Ad = $"{il} Aile ve Sosyal Hizmetler İl Müdürlüğü",
+                    Kod = $"{plaka:00}-ASHIM",
+                    Tur = KurumTur.IlMudurlugu,
+                    UstKurumId = bakanlik.Id,
+                    Il = il,
+                    Adres = $"{il} Aile ve Sosyal Hizmetler İl Müdürlüğü",
+                    Email = $"{ToAsciiSlug(il)}@aile.gov.tr"
+                };
+                await svc.KurumKaydetAsync(ilKurum);
+                kurumlar.Add(ilKurum);
+            }
+
+            foreach (var (suffix, ad, kapasite) in depoTurleri)
+            {
+                var depoKod = $"DEP-{plaka:00}-{suffix.ToUpperInvariant()}";
+                var depoAd = $"{il} {ad}";
+                var mevcutDepo = depolar.Any(d =>
+                    string.Equals(d.Kod, depoKod, StringComparison.OrdinalIgnoreCase) ||
+                    (d.KurumId == ilKurum.Id && string.Equals(d.Ad, depoAd, StringComparison.OrdinalIgnoreCase)));
+                if (mevcutDepo) continue;
+
+                var depo = new Depo
+                {
+                    Id = $"d-{plaka:00}-{suffix}",
+                    Ad = depoAd,
+                    Kod = depoKod,
+                    KurumId = ilKurum.Id,
+                    MerkezDepoMu = false,
+                    Adres = $"{ilKurum.Ad} - {ad}",
+                    KapasiteM2 = kapasite,
+                    AktifMi = true
+                };
+                await svc.DepoKaydetAsync(depo);
+                depolar.Add(depo);
+            }
+        }
+
+        var merkezDepoVar = depolar.Any(d => d.KurumId == bakanlik.Id && d.MerkezDepoMu);
+        if (!merkezDepoVar)
+        {
+            await svc.DepoKaydetAsync(new Depo
+            {
+                Id = "d-merkez",
+                Ad = "Bakanlık Merkez Deposu",
+                Kod = "DEP-MRK-001",
+                KurumId = bakanlik.Id,
+                MerkezDepoMu = true,
+                Adres = "Bakanlık Merkez Teşkilatı - Ankara",
+                KapasiteM2 = 2500,
+                AktifMi = true
+            });
+        }
+    }
+
+    private static string ToAsciiSlug(string value)
+    {
+        return value
+            .Replace("Ç", "C").Replace("Ğ", "G").Replace("İ", "I").Replace("I", "I").Replace("Ö", "O").Replace("Ş", "S").Replace("Ü", "U")
+            .ToLowerInvariant()
+            .Replace("ç", "c").Replace("ğ", "g").Replace("ı", "i").Replace("ö", "o").Replace("ş", "s").Replace("ü", "u")
+            .Replace("â", "a").Replace("î", "i").Replace("û", "u")
+            .Replace(" ", "").Replace("-", "");
+    }
 
     private static async Task SeedKurumlar(IAtomDataService svc)
     {

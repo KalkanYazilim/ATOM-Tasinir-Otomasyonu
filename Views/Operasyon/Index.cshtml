@@ -1,12 +1,54 @@
 @model List<ATOM.Models.Domain.Depo>
 @using ATOM.Models.Domain
 @using ATOM.Models.Accounts
+@using System.Security.Claims
+@using System.Text.Json
 @{
     ViewData["Title"] = "Operasyon Panosu";
+    var kullaniciAnahtari = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.Identity?.Name ?? "anonim";
     var tanimlar = ViewBag.Tanimlar as Dictionary<string, TasinirTanim> ?? new();
     var personeller = ViewBag.Personeller as List<AtomKullanici> ?? new();
     var depoTekiller = ViewBag.DepoTekiller as Dictionary<string, List<TasinirKayit>> ?? new();
+    var kurumDetaylari = ViewBag.KurumDetaylari as Dictionary<string, Kurum> ?? new();
+    var personelZimmetleri = ViewBag.PersonelZimmetleri as Dictionary<string, List<Zimmet>> ?? new();
+    var personelSarfBakiyeleri = ViewBag.PersonelSarfBakiyeleri as Dictionary<string, List<PersonelSarfBakiye>> ?? new();
+    var personelBagliDepolari = ViewBag.PersonelBagliDepolari as Dictionary<string, List<string>> ?? new();
     string TanimAd(string id) => tanimlar.TryGetValue(id, out var t) ? t.Ad : id;
+    string DepoIl(Depo depo) => kurumDetaylari.TryGetValue(depo.KurumId, out var kurum) && !string.IsNullOrWhiteSpace(kurum.Il) ? kurum.Il : "Ankara";
+    string DepoSeviye(Depo depo)
+    {
+        if (depo.MerkezDepoMu || depo.KurumId == "k-bakanlik") return "merkez";
+        if (depo.Kod.EndsWith("-ANA", StringComparison.OrdinalIgnoreCase) ||
+            depo.Ad.Contains("İl Müdürlüğü Ana Deposu", StringComparison.OrdinalIgnoreCase) ||
+            depo.Ad.Contains("İl Deposu", StringComparison.OrdinalIgnoreCase)) return "il";
+        return "kurulus";
+    }
+    string DepoIcon(Depo depo) => DepoSeviye(depo) switch
+    {
+        "merkez" => "bi-building-fill-gear",
+        "il" => "bi-buildings-fill",
+        _ => "bi-box-seam-fill"
+    };
+    string DepoRenk(Depo depo) => DepoSeviye(depo) switch
+    {
+        "merkez" => "#1a3a6b",
+        "il" => "#0d6efd",
+        _ => "#198754"
+    };
+    var depoHaritaVerisi = Model.Select(depo => new
+    {
+        id = depo.Id,
+        ad = depo.Ad,
+        il = DepoIl(depo),
+        toplam = depo.Stoklar.Sum(s => s.Miktar),
+        sarf = depo.Stoklar.Count(s => s.Miktar > 0 && tanimlar.GetValueOrDefault(s.TasinirTanimId)?.DemirbasMi != true),
+        demirbas = depoTekiller.TryGetValue(depo.Id, out var tekiller) ? tekiller.Count : 0,
+        icon = DepoIcon(depo),
+        color = DepoRenk(depo),
+        level = DepoSeviye(depo),
+        adres = depo.Adres
+    }).ToList();
+    var depoHaritaJson = JsonSerializer.Serialize(depoHaritaVerisi, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
 }
 @section Breadcrumb { <ol class="breadcrumb mb-0"><li class="breadcrumb-item active">Operasyon Panosu</li></ol> }
 
@@ -24,16 +66,136 @@
     Tüm işlemler stok/taşınır servislerinden geçer, negatif stok engellenir.
 </div>
 
-<div class="row g-3">
-    <div class="col-lg-9">
+<div class="row g-3 align-items-stretch operasyon-ust-panel mb-3">
+<div class="col-xl-9">
+<div class="card turkiye-map-panel h-100">
+    <div class="card-header bg-white d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div>
+            <div class="fw-semibold"><i class="bi bi-map me-2 text-primary"></i>Türkiye Depo Haritası</div>
+            <div class="small text-muted">İl sınırları PazarCep harita verisi ile çizilir; depo ikonları gerçek il sınırının merkezine yerleşir.</div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-atom-map-reset>
+                <i class="bi bi-arrows-fullscreen me-1"></i>Türkiye
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-primary" data-show-all-depots onclick="tumDepolariGoster()">
+                <i class="bi bi-grid-3x3-gap me-1"></i>Tüm depolar
+            </button>
+        </div>
+    </div>
+    <div class="atom-map-shell">
+        <div id="atomDepotMap" class="atom-depot-map" data-atom-depot-map></div>
+        <div class="atom-map-legend">
+            <span><i class="bi bi-building-fill-gear"></i> Merkez depo</span>
+            <span><i class="bi bi-buildings-fill"></i> İl ana deposu</span>
+            <span><i class="bi bi-box-seam-fill"></i> Kuruluş deposu</span>
+            <span class="text-muted">Yaklaştıkça küçük depolar açılır; ürün sürükleyip depo ikonuna bırakabilirsiniz.</span>
+        </div>
+    </div>
+</div>
+</div>
+
+<div class="col-xl-3">
+    <div class="card h-100 personel-panel">
+        <div class="card-header bg-danger text-white fw-semibold"><i class="bi bi-trash3 me-2"></i>Hurda / Düşüm Alanı</div>
+        <div class="card-body p-2 border-bottom">
+            <div class="drop-hurda text-center py-3 border border-danger rounded" ondragover="izinVer(event)" ondrop="hurdayaBirak(event)">
+                <i class="bi bi-trash3 text-danger me-1"></i><span class="small text-muted">Düşüm yapılacak kalemi buraya bırakın</span>
+            </div>
+        </div>
+        <div class="card-header bg-success text-white fw-semibold"><i class="bi bi-people me-2"></i>Personel / Üzerindeki Malzemeler</div>
+        <div class="card-body p-2 personel-panel-body">
+            @foreach (var depo in Model)
+            {
+                var depoPersonelleri = personeller
+                    .Where(p => (personelBagliDepolari.GetValueOrDefault(p.Id) ?? new()).Contains(depo.Id))
+                    .OrderBy(p => p.AdSoyad)
+                    .ToList();
+                if (!depoPersonelleri.Any()) { continue; }
+                <div class="personel-depo-grup mb-3" data-personel-depo-group="@depo.Id">
+                    <div class="personel-depo-baslik">
+                        <i class="bi bi-building-check"></i>
+                        <span>@depo.Ad</span>
+                        <small>@DepoIl(depo)</small>
+                    </div>
+                    @foreach (var p in depoPersonelleri)
+                    {
+                        var aktifZimmetler = (personelZimmetleri.GetValueOrDefault(p.Id) ?? new()).Where(z => z.DepoId == depo.Id).ToList();
+                        var aktifSarf = (personelSarfBakiyeleri.GetValueOrDefault(p.Id) ?? new()).Where(b => b.KaynakDepoId == depo.Id).ToList();
+                        <div class="drop-personel mb-2 p-2 rounded border"
+                             data-personel="@p.Id" data-personel-depo="@depo.Id" ondragover="izinVer(event)" ondrop="personeleBirak(event,'@p.Id','@p.AdSoyad')">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-person-circle text-success"></i>
+                                <span class="small fw-semibold">@p.AdSoyad</span>
+                                <span class="ms-auto badge bg-light text-dark">@aktifZimmetler.Sum(z => z.Kalemler.Count(k => k.ItemDurumu == ZimmetDurumu.Aktif)) zimmet</span>
+                            </div>
+                            <div class="personel-bagli-depo"><i class="bi bi-link-45deg"></i>Bağlı depo: @depo.Ad</div>
+                            @if (aktifZimmetler.Any())
+                            {
+                                <div class="personel-zimmet-list mt-2">
+                                    @foreach (var z in aktifZimmetler.Take(4))
+                                    {
+                                        foreach (var kalem in z.Kalemler.Where(k => k.ItemDurumu == ZimmetDurumu.Aktif).Take(4))
+                                        {
+                                            <div class="personel-zimmet-item" draggable="true"
+                                                 title="Bağlı depo: @depo.Ad"
+                                                 ondragstart="surukleBasla(event,'personel-demirbas','@z.DepoId','@kalem.TasinirTanimId','@kalem.TasinirKayitId','@TanimAd(kalem.TasinirTanimId)','1','@z.Id','@p.Id')">
+                                                <i class="bi bi-cpu text-warning"></i>
+                                                <span>@TanimAd(kalem.TasinirTanimId)</span>
+                                                <small>@kalem.SicilNo</small>
+                                            </div>
+                                        }
+                                    }
+                                </div>
+                            }
+                            @if (aktifSarf.Any())
+                            {
+                                <div class="personel-sarf-list mt-2">
+                                    @foreach (var b in aktifSarf.Take(4))
+                                    {
+                                        <span class="personel-sarf-chip" draggable="true"
+                                              title="Bağlı depo: @depo.Ad"
+                                              ondragstart="surukleBasla(event,'personel-sarf','@b.KaynakDepoId','@b.TasinirTanimId','@b.Id','@TanimAd(b.TasinirTanimId)','@b.Miktar','','@p.Id')">
+                                            <i class="bi bi-basket2"></i>@TanimAd(b.TasinirTanimId) ×@b.Miktar
+                                        </span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+            @foreach (var p in personeller.Where(p => !(personelBagliDepolari.GetValueOrDefault(p.Id) ?? new()).Any()).OrderBy(p => p.AdSoyad))
+            {
+                <div class="drop-personel personel-baglantisiz mb-2 p-2 rounded border"
+                     data-personel="@p.Id" ondragover="izinVer(event)" ondrop="personeleBirak(event,'@p.Id','@p.AdSoyad')">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-person-circle text-success"></i>
+                        <span class="small fw-semibold">@p.AdSoyad</span>
+                    </div>
+                    <div class="personel-bagli-depo text-muted"><i class="bi bi-link-45deg"></i>Bağlı depo/zimmet kaydı yok</div>
+                </div>
+            }
+            @if (!personeller.Any()) { <div class="text-muted small">Personel yok.</div> }
+        </div>
+    </div>
+</div>
+</div>
+
+<div id="operationWorkspace" class="row g-3 operation-workspace is-empty">
+    <div class="col-12">
         <div class="row g-3">
         @foreach (var depo in Model)
         {
-            <div class="col-md-6">
+            var depoIl = DepoIl(depo);
+            <div class="col-md-6 depo-card-col is-hidden" id="depo-card-@depo.Id" data-depo-card="@depo.Id">
                 <div class="card h-100 depo-kart" data-depo="@depo.Id" ondragover="izinVer(event)" ondrop="depoyaBirak(event,'@depo.Id','@depo.Ad')">
-                    <div class="card-header bg-primary text-white fw-semibold d-flex justify-content-between">
-                        <span><i class="bi bi-building me-2"></i>@depo.Ad</span>
-                        <span class="badge bg-light text-dark">@depo.Stoklar.Sum(s => s.Miktar) adet</span>
+                    <div class="card-header bg-primary text-white fw-semibold d-flex justify-content-between align-items-start gap-2">
+                        <span class="depo-title"><i class="bi bi-building me-2"></i>@depo.Ad <small class="d-block fw-normal opacity-75">@depoIl</small></span>
+                        <span class="d-inline-flex align-items-center gap-2">
+                            <span class="badge bg-light text-dark">@depo.Stoklar.Sum(s => s.Miktar) adet</span>
+                            <button type="button" class="btn-close btn-close-white depo-close" aria-label="@depo.Ad kartını kapat" onclick="depoKapat(event,'@depo.Id')"></button>
+                        </span>
                     </div>
                     <div class="card-body p-2">
                         <div class="text-muted small mb-1"><i class="bi bi-box-seam me-1"></i>Sarf / Stok</div>
@@ -72,38 +234,46 @@
         @if (!Model.Any()) { <div class="col-12"><div class="alert alert-warning">Görüntülenecek depo yok.</div></div> }
         </div>
     </div>
-
-    <div class="col-lg-3">
-        <!-- Personel drop zone -->
-        <div class="card mb-3">
-            <div class="card-header bg-success text-white fw-semibold"><i class="bi bi-people me-2"></i>Personel (zimmet)</div>
-            <div class="card-body p-2" style="max-height:340px;overflow:auto;">
-                @foreach (var p in personeller)
-                {
-                    <div class="drop-personel mb-1 p-2 rounded border d-flex align-items-center gap-2"
-                         data-personel="@p.Id" ondragover="izinVer(event)" ondrop="personeleBirak(event,'@p.Id','@p.AdSoyad')">
-                        <i class="bi bi-person-circle text-success"></i>
-                        <span class="small">@p.AdSoyad</span>
-                    </div>
-                }
-                @if (!personeller.Any()) { <div class="text-muted small">Personel yok.</div> }
-            </div>
-        </div>
-        <!-- Hurda drop zone -->
-        <div class="card border-danger">
-            <div class="card-header bg-danger text-white fw-semibold"><i class="bi bi-trash3 me-2"></i>Hurda / Düşüm Alanı</div>
-            <div class="card-body text-center py-4 drop-hurda" ondragover="izinVer(event)" ondrop="hurdayaBirak(event)">
-                <i class="bi bi-trash display-5 text-danger opacity-50"></i>
-                <div class="small text-muted mt-2">Düşülecek kalemi buraya bırakın</div>
-            </div>
-        </div>
-    </div>
 </div>
 
 <div id="toast" class="position-fixed bottom-0 end-0 m-3 p-3 rounded text-white shadow" style="display:none;z-index:2000;min-width:280px;"></div>
 
 @section Styles {
+<link rel="stylesheet" href="~/lib/leaflet/leaflet.css" asp-append-version="true" />
 <style>
+    .turkiye-map-panel { overflow:hidden; }
+    .operasyon-ust-panel { min-height:620px; }
+    .operasyon-ust-panel > [class*="col-"] { display:flex; }
+    .operasyon-ust-panel .card { width:100%; }
+    .atom-map-shell { position:relative; background:#eef6fb; }
+    .atom-depot-map { width:100%; height:560px; min-height:360px; z-index:1; }
+    .atom-map-legend { position:absolute; left:12px; bottom:12px; z-index:500; display:flex; flex-wrap:wrap; gap:.45rem; max-width:calc(100% - 24px); }
+    .atom-map-legend span { align-items:center; background:rgba(255,255,255,.94); border:1px solid rgba(148,163,184,.34); border-radius:999px; box-shadow:0 8px 18px rgba(15,23,42,.12); display:inline-flex; font-size:.76rem; gap:.35rem; padding:.32rem .58rem; }
+    .atom-map-legend i { color:#1a3a6b; }
+    .atom-depot-div-icon { background:transparent; border:0; }
+    .atom-map-depo-marker { align-items:center; background:#fff; border:2px solid var(--depo-color,#0d6efd); border-radius:999px; box-shadow:0 10px 22px rgba(15,23,42,.22); color:var(--depo-color,#0d6efd); display:flex; height:38px; justify-content:center; position:relative; transition:box-shadow .16s ease, filter .16s ease; width:38px; }
+    .atom-map-depo-marker:hover, .atom-map-depo-marker.is-active { box-shadow:0 14px 28px rgba(15,23,42,.28); filter:brightness(1.05); }
+    .atom-map-depo-marker.is-drop-target { outline:3px dashed #198754; outline-offset:3px; }
+    .atom-map-depo-marker i { font-size:1.2rem; line-height:1; }
+    .atom-map-depo-marker b { align-items:center; background:#dc3545; border:2px solid #fff; border-radius:999px; color:#fff; display:inline-flex; font-size:.62rem; height:19px; justify-content:center; min-width:19px; padding:0 4px; position:absolute; right:-8px; top:-8px; }
+    .atom-map-tooltip strong { color:#14213d; display:block; margin-bottom:.2rem; }
+    .atom-map-tooltip div { color:#475569; font-size:.78rem; line-height:1.25; }
+    .atom-map-tooltip .text-primary { color:#0d6efd !important; }
+    .leaflet-container { font-family:'Segoe UI', sans-serif; }
+    .leaflet-interactive.atom-province-active { filter:drop-shadow(0 8px 12px rgba(15,23,42,.22)); }
+    .operation-workspace.is-empty { display:none; }
+    .depo-card-col.is-hidden { display:none; }
+    .depo-card-col.is-hidden:target { display:block; }
+    .depo-title { min-width:0; line-height:1.15; }
+    .depo-close { width:.75rem; height:.75rem; padding:.35rem; flex:0 0 auto; }
+    .personel-panel { min-height:620px; }
+    .personel-panel-body { max-height:548px; overflow:auto; }
+    .personel-depo-grup.is-hidden { display:none; }
+    .personel-baglantisiz.is-hidden { display:none; }
+    .personel-depo-baslik { align-items:center; background:#f1f5f9; border:1px solid #dbe3ec; border-radius:.4rem; color:#14213d; display:grid; font-size:.76rem; font-weight:700; gap:.3rem; grid-template-columns:auto minmax(0,1fr) auto; margin-bottom:.45rem; padding:.35rem .45rem; }
+    .personel-depo-baslik span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .personel-depo-baslik small { color:#64748b; font-size:.68rem; font-weight:500; }
+    .personel-bagli-depo { align-items:center; color:#64748b; display:flex; font-size:.68rem; gap:.2rem; margin-top:.2rem; }
     .chip { display:inline-flex; align-items:center; gap:5px; padding:4px 8px; border-radius:1rem; font-size:.78rem;
             cursor:grab; user-select:none; border:1px solid #cfd8e3; background:#fff; }
     .chip.sarf { background:#eef5ff; border-color:#bcd6f5; }
@@ -112,17 +282,279 @@
     .chip-img { width:20px; height:20px; object-fit:cover; border-radius:3px; }
     .depo-kart.dragover { outline:3px dashed #0d6efd; outline-offset:-3px; }
     .drop-personel.dragover { background:#d1e7dd; outline:2px dashed #198754; }
+    .personel-zimmet-list { display:grid; gap:.25rem; }
+    .personel-zimmet-item { align-items:center; background:#fffdf4; border:1px solid #f1dfaa; border-radius:.35rem; cursor:grab; display:grid; font-size:.72rem; gap:.25rem; grid-template-columns:auto minmax(0,1fr) auto; padding:.25rem .35rem; }
+    .personel-zimmet-item span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .personel-zimmet-item small { color:#64748b; font-size:.68rem; }
+    .personel-sarf-list { display:flex; flex-wrap:wrap; gap:.25rem; }
+    .personel-sarf-chip { align-items:center; background:#eef5ff; border:1px solid #bcd6f5; border-radius:999px; color:#1d4ed8; cursor:grab; display:inline-flex; font-size:.7rem; gap:.25rem; padding:.18rem .42rem; }
     .drop-hurda.dragover { background:#f8d7da; outline:2px dashed #dc3545; }
+    @@media (max-width: 767.98px) {
+        .atom-depot-map { height:330px; }
+        .atom-map-legend { position:static; padding:.65rem; }
+        .operasyon-ust-panel { min-height:0; }
+        .personel-panel { min-height:0; }
+        .personel-panel-body { max-height:360px; }
+    }
 </style>
 }
 
 @section Scripts {
+<script src="~/lib/leaflet/leaflet.js" asp-append-version="true"></script>
 <script>
 let sur = null;
-const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+const depoHaritaVerisi = @Html.Raw(depoHaritaJson);
+const depoStorageKey = 'atom.operasyon.sonDepolar.@kullaniciAnahtari';
+let atomDepotMap = null;
+let atomProvinceLayer = null;
+const atomDepotMarkers = new Map();
+const atomDepotMarkerItems = [];
 
-function surukleBasla(e, tip, depo, tanim, kayit, ad, max) {
-    sur = { tip, depo, tanim, kayit, ad, max: parseInt(max) || 0 };
+function sonDepolariOku() {
+    try {
+        const value = JSON.parse(localStorage.getItem(depoStorageKey) || '[]');
+        return Array.isArray(value) ? value.filter(Boolean) : [];
+    } catch {
+        return [];
+    }
+}
+
+function sonDepolariYaz(depoIds) {
+    const temiz = [];
+    depoIds.forEach(id => {
+        if (id && !temiz.includes(id)) temiz.push(id);
+    });
+    localStorage.setItem(depoStorageKey, JSON.stringify(temiz.slice(0, 12)));
+}
+
+function sonDepoyaEkle(...depoIds) {
+    const mevcut = sonDepolariOku().filter(id => !depoIds.includes(id));
+    sonDepolariYaz([...depoIds.filter(Boolean), ...mevcut]);
+}
+
+function sonDepodanCikar(depoId) {
+    sonDepolariYaz(sonDepolariOku().filter(id => id !== depoId));
+}
+
+function varsayilanDepolariAc() {
+    const sonDepolar = sonDepolariOku();
+    sonDepolar.forEach(depoId => depoGoster(depoId, { scroll: false, focusMap: false, remember: false }));
+    operasyonCalismaAlaniGuncelle();
+}
+
+function operasyonCalismaAlaniGuncelle() {
+    const workspace = document.getElementById('operationWorkspace');
+    if (!workspace) return;
+    const acikDepolar = Array.from(document.querySelectorAll('[data-depo-card]')).filter(x => !x.classList.contains('is-hidden'));
+    const acikDepoVar = acikDepolar.length > 0;
+    workspace.classList.toggle('is-empty', !acikDepoVar);
+    const acikDepoIds = new Set(acikDepolar.map(x => x.dataset.depoCard));
+    document.querySelectorAll('[data-personel-depo-group]').forEach(group => {
+        group.classList.toggle('is-hidden', acikDepoVar && !acikDepoIds.has(group.dataset.personelDepoGroup));
+    });
+    document.querySelectorAll('.personel-baglantisiz').forEach(card => {
+        card.classList.toggle('is-hidden', acikDepoVar);
+    });
+}
+
+function atomNormalize(value) {
+    return (value || '').toLocaleLowerCase('tr-TR')
+        .replaceAll('ı', 'i').replaceAll('ğ', 'g').replaceAll('ü', 'u')
+        .replaceAll('ş', 's').replaceAll('ö', 'o').replaceAll('ç', 'c')
+        .replace(/\s+/g, ' ').trim();
+}
+
+function atomProvinceMatches(provinceName, depotCity) {
+    const province = atomNormalize(provinceName);
+    const city = atomNormalize(depotCity);
+    return province === city || province.startsWith(city) || city.startsWith(province);
+}
+
+function atomProvinceStyle(feature) {
+    const city = feature?.properties?.name || '';
+    const hasDepot = depoHaritaVerisi.some(depo => atomProvinceMatches(city, depo.il));
+    return {
+        color: hasDepot ? '#1a3a6b' : '#8aa0b6',
+        fillColor: hasDepot ? '#dceafe' : '#edf3f8',
+        fillOpacity: hasDepot ? .34 : .13,
+        opacity: .9,
+        weight: hasDepot ? 1.8 : 1
+    };
+}
+
+function atomCreateDepotIcon(depo) {
+    const html = `<span class="atom-map-depo-marker" data-depo-id="${depo.id}" style="--depo-color:${depo.color}">
+        <i class="bi ${depo.icon}"></i><b>${depo.toplam}</b>
+    </span>`;
+    return L.divIcon({ className: 'atom-depot-div-icon', html, iconSize: [38, 38], iconAnchor: [19, 19] });
+}
+
+function atomDepotTooltip(depo) {
+    return `<div class="atom-map-tooltip">
+        <strong>${depo.ad}</strong>
+        <div>İl: ${depo.il}</div>
+        <div>Adres: ${depo.adres || '-'}</div>
+        <div>Toplam stok: <span class="text-primary fw-semibold">${depo.toplam}</span></div>
+        <div>Sarf çeşit: ${depo.sarf} · Demirbaş: ${depo.demirbas}</div>
+    </div>`;
+}
+
+function atomDepotMarkerVisible(item) {
+    if (!atomDepotMap) return false;
+    const zoom = atomDepotMap.getZoom();
+    if (item.depo.level === 'merkez') return true;
+    if (item.depo.level === 'il') return zoom >= 6.8;
+    if (zoom < 8.4) return false;
+    return atomDepotMap.getBounds().pad(.35).contains(item.marker.getLatLng());
+}
+
+function atomMarkerGorunumunuGuncelle() {
+    if (!atomDepotMap) return;
+    atomDepotMarkerItems.forEach(item => {
+        const visible = atomDepotMarkerVisible(item);
+        const onMap = atomDepotMap.hasLayer(item.marker);
+        if (visible && !onMap) item.marker.addTo(atomDepotMap);
+        if (!visible && onMap) atomDepotMap.removeLayer(item.marker);
+    });
+}
+
+function atomAttachMarkerDrop(marker, depo) {
+    marker.on('add', () => {
+        const el = marker.getElement();
+        const target = el?.querySelector('.atom-map-depo-marker');
+        if (!target) return;
+        target.addEventListener('dragover', event => {
+            event.preventDefault();
+            target.classList.add('is-drop-target');
+        });
+        target.addEventListener('dragleave', () => target.classList.remove('is-drop-target'));
+        target.addEventListener('drop', event => {
+            target.classList.remove('is-drop-target');
+            depoyaBirak(event, depo.id, depo.ad);
+        });
+    });
+}
+
+async function atomHaritayiBaslat() {
+    const mapEl = document.getElementById('atomDepotMap');
+    if (!mapEl || !window.L) return;
+    atomDepotMap = L.map(mapEl, { zoomControl: true, preferCanvas: true, minZoom: 5, maxBoundsViscosity: .35 })
+        .setView([39, 35], 6);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+        attribution: '&copy; OpenStreetMap katkıcıları'
+    }).addTo(atomDepotMap);
+
+    const response = await fetch('/data/maps/turkey-provinces.json', { headers: { 'Accept': 'application/json' } });
+    if (!response.ok) throw new Error('Türkiye il sınırları yüklenemedi.');
+    const provinces = await response.json();
+    const provinceCenters = new Map();
+
+    atomProvinceLayer = L.geoJSON(provinces, {
+        style: atomProvinceStyle,
+        onEachFeature: (feature, layer) => {
+            const props = feature.properties || {};
+            const city = props.name || '';
+            if (layer.getBounds?.().isValid()) {
+                provinceCenters.set(atomNormalize(city), layer.getBounds().getCenter());
+            }
+            layer.bindTooltip(`<strong>${city}</strong>`, { sticky: true, direction: 'top' });
+            layer.on('mouseover', () => layer.setStyle({ fillOpacity: .46, weight: 2.6 }));
+            layer.on('mouseout', () => layer.setStyle(atomProvinceStyle(feature)));
+            layer.on('click', () => {
+                const matched = depoHaritaVerisi.filter(depo => atomProvinceMatches(city, depo.il));
+                if (matched.length) {
+                    matched.forEach(depo => depoGoster(depo.id, { focusMap: false }));
+                    atomDepotMap.fitBounds(layer.getBounds(), { padding: [28, 28], maxZoom: 9 });
+                }
+            });
+        }
+    }).addTo(atomDepotMap);
+
+    depoHaritaVerisi.forEach((depo, index) => {
+        const exact = provinceCenters.get(atomNormalize(depo.il));
+        const fallback = Array.from(provinceCenters.entries()).find(([name]) => atomProvinceMatches(name, depo.il))?.[1];
+        const center = exact || fallback || L.latLng(39, 35);
+        const sameCityIndex = depoHaritaVerisi.slice(0, index).filter(x => atomNormalize(x.il) === atomNormalize(depo.il)).length;
+        const ring = Math.floor(Math.max(0, sameCityIndex - 1) / 8);
+        const radius = sameCityIndex === 0 ? 0 : .42 + (ring * .18);
+        const angle = sameCityIndex * 2.399963229728653;
+        const offset = sameCityIndex === 0 ? [0, 0] : [radius * Math.cos(angle), radius * Math.sin(angle)];
+        const marker = L.marker([center.lat + offset[1], center.lng + offset[0]], {
+            icon: atomCreateDepotIcon(depo),
+            title: depo.ad,
+            zIndexOffset: depo.icon.includes('building') ? 500 : sameCityIndex
+        }).bindTooltip(atomDepotTooltip(depo), { direction: 'top', className: 'atom-map-tooltip-shell' });
+        marker.on('click', () => depoGoster(depo.id));
+        atomAttachMarkerDrop(marker, depo);
+        atomDepotMarkerItems.push({ depo, marker });
+        atomDepotMarkers.set(depo.id, marker);
+    });
+
+    if (atomProvinceLayer.getBounds().isValid()) {
+        atomDepotMap.fitBounds(atomProvinceLayer.getBounds(), { padding: [18, 18] });
+    }
+    atomDepotMap.on('zoomend moveend', atomMarkerGorunumunuGuncelle);
+    atomMarkerGorunumunuGuncelle();
+
+    document.querySelector('[data-atom-map-reset]')?.addEventListener('click', () => {
+        if (atomProvinceLayer?.getBounds().isValid()) atomDepotMap.fitBounds(atomProvinceLayer.getBounds(), { padding: [18, 18] });
+    });
+    varsayilanDepolariAc();
+    window.addEventListener('resize', () => atomDepotMap.invalidateSize());
+}
+
+atomHaritayiBaslat().catch(error => {
+    const mapEl = document.getElementById('atomDepotMap');
+    if (mapEl) mapEl.innerHTML = `<div class="alert alert-danger m-3">${error.message}</div>`;
+});
+
+function depoGoster(depoId, options) {
+    if (!depoId) return;
+    const ayar = Object.assign({ scroll: true, focusMap: true, remember: true }, options || {});
+    document.querySelectorAll('.atom-map-depo-marker').forEach(x => x.classList.remove('is-active'));
+    const card = document.querySelector(`[data-depo-card="${depoId}"]`);
+    if (!card) return;
+    card.classList.remove('is-hidden');
+    operasyonCalismaAlaniGuncelle();
+    if (ayar.remember) sonDepoyaEkle(depoId);
+    const marker = document.querySelector(`.atom-map-depo-marker[data-depo-id="${depoId}"]`);
+    const leafletMarker = atomDepotMarkers.get(depoId);
+    if (ayar.focusMap && leafletMarker && atomDepotMap) {
+        if (!atomDepotMap.hasLayer(leafletMarker)) leafletMarker.addTo(atomDepotMap);
+        const depo = depoHaritaVerisi.find(x => x.id === depoId);
+        const hedefZoom = depo?.level === 'kurulus' ? 9 : (depo?.level === 'il' ? 7 : 6);
+        atomDepotMap.setView(leafletMarker.getLatLng(), Math.max(atomDepotMap.getZoom(), hedefZoom), { animate: true });
+        leafletMarker.openTooltip();
+    }
+    const visibleMarker = document.querySelector(`.atom-map-depo-marker[data-depo-id="${depoId}"]`);
+    visibleMarker?.classList.add('is-active');
+    if (ayar.scroll) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function depoKapat(e, depoId) {
+    e.preventDefault();
+    e.stopPropagation();
+    document.querySelector(`[data-depo-card="${depoId}"]`)?.classList.add('is-hidden');
+    sonDepodanCikar(depoId);
+    operasyonCalismaAlaniGuncelle();
+    document.querySelectorAll('.atom-map-depo-marker').forEach(x => {
+        if (x.dataset.depoId === depoId) x.classList.remove('is-active');
+    });
+}
+
+function tumDepolariGoster() {
+    document.querySelectorAll('[data-depo-card]').forEach(x => x.classList.remove('is-hidden'));
+    sonDepolariYaz(Array.from(document.querySelectorAll('[data-depo-card]')).map(x => x.dataset.depoCard));
+    operasyonCalismaAlaniGuncelle();
+    document.querySelectorAll('.atom-map-depo-marker').forEach(x => x.classList.remove('is-active'));
+    if (atomProvinceLayer?.getBounds().isValid() && atomDepotMap) atomDepotMap.fitBounds(atomProvinceLayer.getBounds(), { padding: [18, 18] });
+}
+
+function surukleBasla(e, tip, depo, tanim, kayit, ad, max, ref1, ref2) {
+    sur = { tip, depo, tanim, kayit, ad, max: parseInt(max) || 0, ref1: ref1 || '', ref2: ref2 || '' };
     e.dataTransfer.effectAllowed = 'move';
 }
 function izinVer(e) { e.preventDefault(); e.currentTarget.classList.add('dragover'); }
@@ -148,18 +580,52 @@ async function gonder(url, data) {
 function depoyaBirak(e, hedefDepo, hedefAd) {
     e.preventDefault();
     if (!sur) return;
-    if (sur.tip !== 'sarf') { toast(false, 'Depoya yalnızca sarf kalemi sürüklenebilir (demirbaş → personel/hurda).'); return; }
+    if (sur.tip === 'personel-demirbas') {
+        if (sur.depo !== hedefDepo) { toast(false, 'Personel üzerindeki demirbaş yalnızca bağlı olduğu depoya iade edilebilir.'); return; }
+        if (!confirm(`${sur.ad} → ${hedefAd}\nPersonel üzerindeki demirbaş bağlı depoya iade alınsın mı?`)) return;
+        sonDepoyaEkle(hedefDepo);
+        gonder('/Operasyon/ZimmetIadeYap', { zimmetId: sur.ref1, tasinirKayitId: sur.kayit, hedefDepoId: hedefDepo });
+        return;
+    }
+    if (sur.tip === 'personel-sarf') {
+        if (sur.depo !== hedefDepo) { toast(false, 'Personel üzerindeki sarf yalnızca verildiği bağlı depoya iade edilebilir.'); return; }
+        let m = prompt(`${sur.ad} → ${hedefAd}\nİade miktarı (max ${sur.max}):`, '1');
+        if (m === null) return;
+        m = parseInt(m); if (!m || m < 1 || m > sur.max) { toast(false, 'Geçersiz miktar.'); return; }
+        sonDepoyaEkle(hedefDepo);
+        gonder('/Operasyon/PersonelSarfIadeYap', { bakiyeId: sur.kayit, hedefDepoId: hedefDepo, miktar: m });
+        return;
+    }
+    if (sur.tip === 'demirbas') {
+        if (sur.depo === hedefDepo) { toast(false, 'Aynı depo.'); return; }
+        if (!confirm(`${sur.ad} → ${hedefAd}\nTekil demirbaş hedef depoya sevk edilsin mi?`)) return;
+        sonDepoyaEkle(hedefDepo, sur.depo);
+        gonder('/Operasyon/DemirbasSevkYap', { tasinirKayitId: sur.kayit, hedefDepoId: hedefDepo });
+        return;
+    }
     if (sur.depo === hedefDepo) { toast(false, 'Aynı depo.'); return; }
+    if (sur.tip !== 'sarf') { toast(false, 'Bu kalem depoya bırakılamaz.'); return; }
     let m = prompt(`${sur.ad} → ${hedefAd}\nSevk miktarı (max ${sur.max}):`, '1');
     if (m === null) return;
     m = parseInt(m); if (!m || m < 1 || m > sur.max) { toast(false, 'Geçersiz miktar.'); return; }
+    sonDepoyaEkle(hedefDepo, sur.depo);
     gonder('/Operasyon/SevkYap', { kaynakDepoId: sur.depo, hedefDepoId: hedefDepo, tanimId: sur.tanim, miktar: m });
 }
 function personeleBirak(e, personelId, personelAd) {
     e.preventDefault();
     if (!sur) return;
-    if (sur.tip !== 'demirbas') { toast(false, 'Personele yalnızca tekil demirbaş zimmetlenir.'); return; }
+    if (sur.tip === 'sarf') {
+        let m = prompt(`${sur.ad} → ${personelAd}\nPersonel adına tüketim miktarı (max ${sur.max}):`, '1');
+        if (m === null) return;
+        m = parseInt(m); if (!m || m < 1 || m > sur.max) { toast(false, 'Geçersiz miktar.'); return; }
+        const kullanimYeri = prompt('Kullanım yeri / amaç:', personelAd) || personelAd;
+        sonDepoyaEkle(sur.depo);
+        gonder('/Operasyon/TuketimYap', { depoId: sur.depo, tanimId: sur.tanim, miktar: m, personelId, kullanimYeri });
+        return;
+    }
+    if (sur.tip !== 'demirbas') { toast(false, 'Bu işlem türü personele bırakılamaz.'); return; }
     if (!confirm(`${sur.ad} → ${personelAd}\nZimmet oluşturulsun mu?`)) return;
+    sonDepoyaEkle(sur.depo);
     gonder('/Operasyon/ZimmetYap', { tasinirKayitId: sur.kayit, personelId });
 }
 function hurdayaBirak(e) {
@@ -169,6 +635,7 @@ function hurdayaBirak(e) {
     if (g === null) return;
     let m = sur.tip === 'sarf' ? (parseInt(prompt(`Miktar (max ${sur.max}):`, '1')) || 0) : 1;
     if (sur.tip === 'sarf' && (m < 1 || m > sur.max)) { toast(false, 'Geçersiz miktar.'); return; }
+    sonDepoyaEkle(sur.depo);
     gonder('/Operasyon/HurdaYap', { depoId: sur.depo, tanimId: sur.tanim, miktar: m, tasinirKayitId: sur.kayit || '', gerekce: g });
 }
 </script>
